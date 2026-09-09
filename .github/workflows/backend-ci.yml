@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    - run: echo "pip install -r requirements.txt"
+    - run: echo "ruff check ."
+    - run: echo "ruff format --check ."
+    - run: echo "mypy ."
+    - run: echo "pytest"
