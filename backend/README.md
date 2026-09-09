@@ -6,10 +6,10 @@ This service acts as the authoritative core for learning progression, node state
 
 ## Project Structure
 
-- `src/api/`: FastAPI REST endpoints for the core entities (Goals, Learners, Paths, Nodes, etc.).
-- `src/services/`: Business logic governing state machine transitions.
-- `src/repository/`: Data access layer (currently mocked for MVP).
-- `src/models/`: Pydantic domain models and API payloads.
+- `app/api/`: FastAPI REST endpoints for the core entities (Goals, Learners, Paths, Nodes, etc.).
+- `app/services/`: Business logic governing state machine transitions.
+- `app/repository/`: Data access layer (currently mocked for MVP).
+- `app/models/`: Pydantic domain models and API payloads.
 - `docs/`: Data model and architectural documentation.
 - `infra/exasol/`: SQL schema, seeds, and analytical queries.
 
@@ -30,7 +30,7 @@ We recommend using [`uv`](https://github.com/astral-sh/uv) for fast dependency m
 
 3. **Run the server locally:**
    ```bash
-   uvicorn src.main:app --reload
+   uvicorn app.main:app --reload
    ```
 
    The server will start at `http://127.0.0.1:8000`. 
