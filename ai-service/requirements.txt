@@ -5,5 +5,5 @@ langchain
 pytest
 ruff
 mypy
-langchain-openai
+langchain-huggingface
 langgraph

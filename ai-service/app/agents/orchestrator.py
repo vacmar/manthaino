@@ -1,4 +1,4 @@
-from langchain_openai import ChatOpenAI
+from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 from app.tools.path_tools import get_skill_gaps, get_candidate_paths
 from app.context.context_builder import build_learner_context
 from app.models.structured_outputs import PathRecommendation
