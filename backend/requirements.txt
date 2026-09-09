@@ -1,1 +1,7 @@
-fastapi\nuvicorn\npydantic\nexasol-driver\npytest\nruff\nmypy\n
+fastapi
+uvicorn
+pydantic
+pyexasol
+pytest
+ruff
+mypy
