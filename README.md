@@ -6,7 +6,7 @@ The project has been structured as a monorepo consisting of a Next.js frontend, 
 
 ## Current Implementation Status
 
-We have successfully completed **Phases 0, 1, and 2** of the Antigravity Master Build Prompt.
+We have successfully completed **Phases 0, 1, 2, and 3** of the Antigravity Master Build Prompt.
 
 ### Phase 0: Repository Foundation
 - Established a unified monorepo structure containing `frontend`, `backend`, and `ai-service` directories.
@@ -32,5 +32,14 @@ The core FastAPI application has been built inside `backend/app/`:
 - **API Endpoints**: All required API routers were scaffolded (`goals`, `learners`, `assessments`, `paths`, `nodes`, `conversations`, `projects`) and integrated into `main.py`.
 - **Validation**: Wrote `pytest` suites to verify that the core node unlocking state transitions function exactly as specified.
 
+### Phase 3: AI Service & LangGraph Orchestrator
+The core AI orchestration service has been implemented inside `ai-service/app/`:
+- **LangGraph StateGraph Engine**: Asynchronous state machine orchestrating context retrieval, LLM reasoning, iterative tool execution loops, and structured output parsing.
+- **Model Adapter**: Configured for OpenRouter (`meta-llama/llama-3.3-70b-instruct:free`) and Groq with seamless fallback to deterministic `MockChatModel` for offline/CI runs.
+- **Specification Tools**: Implemented and registered all 16 specification tools (`get_learner_profile`, `calculate_skill_gaps`, `get_learning_node_state`, `complete_learning_node`, etc.) bound to an async backend client.
+- **Context Builder**: Compacts rolling conversation summaries, recent dialogues, and node states into token-budgeted system prompts.
+- **Personas & Structured Models**: Specialized endpoints and Pydantic output schemas for **AI Tutor** (`/chat/tutor`), **Pathway Reasoner** (`/chat/pathway-explanation`), and **Project Mentor** (`/chat/project-mentor`), alongside tool discovery (`/tools`).
+- **Validation & Quality**: 13 comprehensive pytest test cases passing and 100% Ruff lint compliance.
+
 ### Next Up
-- **Phase 3**: AI Service (Orchestrator, context builder, structured tool calls).
+- **Phase 4**: Frontend (Next.js App Router, Tailwind CSS, shadcn/ui, onboarding, path visualization, and persistent learning workspace).

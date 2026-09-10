@@ -1,7 +1,12 @@
 fastapi
 uvicorn
 pydantic
-langchain
+pydantic-settings
+langgraph
+langchain-core
+langchain-openai
+httpx
 pytest
+pytest-asyncio
 ruff
 mypy
