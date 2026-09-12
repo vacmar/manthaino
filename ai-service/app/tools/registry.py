@@ -22,6 +22,7 @@ from app.tools.schemas import (
     UpdateSkillEvidenceArgs,
     GetLessonContextArgs,
     RecordMistakeArgs,
+    EvaluateProjectArgs,
 )
 
 
@@ -133,6 +134,29 @@ async def record_mistake(learner_id: str, node_id: str, concept: str, descriptio
     return await backend_client.record_mistake(learner_id, node_id, concept, description)
 
 
+@tool(args_schema=EvaluateProjectArgs)
+async def evaluate_project(
+    submission_id: str, 
+    project_id: str,
+    score: float, 
+    passed: bool, 
+    requirements: list[dict], 
+    skills_demonstrated: list[dict], 
+    strengths: list[str], 
+    improvements: list[str]
+) -> dict[str, Any]:
+    """Evaluate a project submission against requirements. Triggers backend validation."""
+    payload = {
+        "submission_id": submission_id,
+        "score": score,
+        "passed": passed,
+        "requirements": requirements,
+        "skills_demonstrated": skills_demonstrated,
+        "strengths": strengths,
+        "improvements": improvements
+    }
+    return await backend_client.evaluate_project(project_id, payload)
+
 ALL_TOOLS: list[BaseTool] = [
     get_learner_profile,
     get_current_skill_state,
@@ -152,6 +176,7 @@ ALL_TOOLS: list[BaseTool] = [
     update_skill_evidence,
     check_unlock_conditions,
     complete_learning_node,
+    evaluate_project,
 ]
 
 TOOLS_BY_NAME: dict[str, BaseTool] = {tool_inst.name: tool_inst for tool_inst in ALL_TOOLS}

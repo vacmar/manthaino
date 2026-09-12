@@ -114,3 +114,26 @@ def get_skill_evidence(learner_id: str, skill_id: str) -> list:
         if v["learner_id"] == learner_id and v["skill_id"] == skill_id:
             records.append(v)
     return records
+
+# --- Projects ---
+def get_project(project_id: str) -> dict:
+    return db["projects"].get(project_id)
+
+def get_project_skills(project_id: str) -> list:
+    proj = db["projects"].get(project_id)
+    if proj:
+        return proj.get("taught_skills", [])
+    return []
+
+def get_project_submission(submission_id: str) -> dict:
+    return db["project_submissions"].get(submission_id)
+
+def get_project_submissions_for_learner(learner_id: str, project_id: str) -> list:
+    results = []
+    for sub in db["project_submissions"].values():
+        if sub["learner_id"] == learner_id and sub["project_id"] == project_id:
+            results.append(sub)
+    return results
+
+def save_project_submission(submission: dict):
+    db["project_submissions"][submission["submission_id"]] = submission

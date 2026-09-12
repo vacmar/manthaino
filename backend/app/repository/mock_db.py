@@ -23,6 +23,20 @@ db = {
         "skill_py": {"name": "Python"},
         "skill_sql": {"name": "SQL"}
     },
+    "projects": {
+        "proj_1": {
+            "title": "Build a Simple API",
+            "description": "Create a FastAPI application with two endpoints.",
+            "requirements": [
+                {"requirement_id": "req_fastapi", "description": "Must use FastAPI", "mandatory": True},
+                {"requirement_id": "req_health", "description": "Must have /health endpoint", "mandatory": True},
+                {"requirement_id": "req_json", "description": "Must return JSON", "mandatory": True},
+                {"requirement_id": "req_auth", "description": "Optional: Add basic auth", "mandatory": False}
+            ],
+            "taught_skills": ["skill_py"]
+        }
+    },
+    "project_submissions": {}, # submission_id -> submission dict
     "evidence": {},       # (learner_id, skill_id, source_type, source_id) -> evidence dict
     "proficiency": {},    # (learner_id, skill_id) -> proficiency dict
 }

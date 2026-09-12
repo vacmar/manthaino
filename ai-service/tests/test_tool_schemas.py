@@ -23,7 +23,8 @@ EXPECTED_TOOLS = [
 
 
 def test_all_sixteen_tools_registered():
-    assert len(ALL_TOOLS) == 18
+    assert len(ALL_TOOLS) == 19
+    assert len(TOOLS_BY_NAME) == 19
     for tool_name in EXPECTED_TOOLS:
         assert tool_name in TOOLS_BY_NAME, f"Tool {tool_name} is missing from registry"
 

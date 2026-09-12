@@ -88,3 +88,23 @@ class RecordMistakeArgs(BaseModel):
     node_id: str = Field(description="Path node identifier")
     concept: str = Field(description="The underlying concept the learner struggled with (e.g. 'functools.wraps')")
     description: str = Field(description="Detailed description of the mistake or misunderstanding")
+
+class RequirementEvaluation(BaseModel):
+    requirement_id: str = Field(description="Unique identifier of the project requirement")
+    status: str = Field(description="PASS, FAIL, or PARTIAL")
+    evidence: str = Field(description="Specific evidence from the artifact justifying the status")
+
+class SkillDemonstration(BaseModel):
+    skill_id: str = Field(description="Unique identifier of the skill demonstrated")
+    score: float = Field(description="Numerical score (0.0 to 1.0)")
+    confidence: float = Field(description="Confidence in this assessment (0.0 to 1.0)")
+
+class EvaluateProjectArgs(BaseModel):
+    submission_id: str = Field(description="Unique identifier of the learner's submission")
+    project_id: str = Field(description="Unique identifier of the project")
+    score: float = Field(description="Overall project score (0.0 to 100.0)")
+    passed: bool = Field(description="Informational flag indicating if the project passed (backend determines final)")
+    requirements: list[RequirementEvaluation] = Field(description="Evaluation of each specific project requirement")
+    skills_demonstrated: list[SkillDemonstration] = Field(description="Specific skills demonstrated and their scores")
+    strengths: list[str] = Field(description="Identified strengths in the submission")
+    improvements: list[str] = Field(description="Constructive improvements for the submission")

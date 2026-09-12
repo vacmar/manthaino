@@ -195,5 +195,11 @@ class BackendClient:
             fallback_data={"node_id": node_id, "success": (assessment_score >= 0.8 and practical_pass)}
         )
 
+    async def evaluate_project(self, project_id: str, evaluation_payload: dict[str, Any]) -> dict[str, Any]:
+        return await self._safe_post(
+            f"/projects/{project_id}/evaluate",
+            evaluation_payload,
+            fallback_data={"status": "PASSED" if evaluation_payload.get("passed", False) else "NEEDS_REVISION", "feedback": "Fallback", "skills_updated": [], "unlocked_nodes": [], "next_recommended_node": None}
+        )
 
 backend_client = BackendClient()
