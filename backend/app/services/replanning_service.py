@@ -14,7 +14,7 @@ def _get_target_role_requirements(learner_id: str) -> dict[str, float]:
     return role.get("required_skills", {}) if role else {}
 
 
-def _get_available_course_for_skill(skill_id: str) -> dict[str, Any]:
+def _get_available_course_for_skill(skill_id: str) -> dict[str, Any] | None:
     # In MVP, assume 1 course maps to 1 skill primarily for replanning simplicity
     for course_id, course in state_repo.db.get("courses", {}).items():
         if skill_id in course.get("taught_skills", []):
@@ -267,7 +267,7 @@ def regenerate_path(learner_id: str, current_path_id: str) -> dict[str, Any]:
 
     # We could also add PROFICIENCY_CHANGE facts if we track the delta since last replan,
     # but for MVP we can just list current proficiencies.
-    prof_changes = []
+    prof_changes: list[dict[str, Any]] = []
 
     return {
         "path_id": new_path_id,

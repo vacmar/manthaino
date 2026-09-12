@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -11,7 +12,7 @@ router = APIRouter(prefix="/chat", tags=["Chat & Personas"])
 
 async def _run_persona(request: ChatRequest, persona: str) -> ChatResponse:
     try:
-        init_state = {
+        init_state: dict[str, Any] = {
             "messages": [],
             "persona": persona,
             "user_message": request.message,
@@ -39,7 +40,7 @@ async def _run_persona(request: ChatRequest, persona: str) -> ChatResponse:
 
 
 async def _stream_persona(request: ChatRequest, persona: str):
-    init_state = {
+    init_state: dict[str, Any] = {
         "messages": [],
         "persona": persona,
         "user_message": request.message,

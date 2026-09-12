@@ -1,5 +1,7 @@
+from typing import Any
+
 # In-memory store for MVP testing
-db = {
+db: dict[str, Any] = {
     "paths": {},
     "nodes": {},
     "prerequisites": {

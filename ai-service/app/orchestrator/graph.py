@@ -143,7 +143,7 @@ async def validator_node(state: AgentState) -> dict[str, Any]:
             )
             for i, s in enumerate(stages_raw)
         ]
-        structured = PathwayExplanation(
+        structured_pathway = PathwayExplanation(
             summary=parsed_json.get("summary", content),
             target_role=parsed_json.get(
                 "target_role", state.get("role_id") or "Target Role"
@@ -156,11 +156,11 @@ async def validator_node(state: AgentState) -> dict[str, Any]:
             estimated_total_hours=float(parsed_json.get("estimated_total_hours", 40.0)),
             tools_used=tools_used,
         )
-        structured_data = structured.model_dump()
-        final_text = structured.summary
+        structured_data = structured_pathway.model_dump()
+        final_text = structured_pathway.summary
 
     elif persona == "project_mentor":
-        structured = ProjectMentorFeedback(
+        structured_project = ProjectMentorFeedback(
             project_title=parsed_json.get(
                 "project_title", state.get("project_id") or "Practical Capstone"
             ),
@@ -181,11 +181,11 @@ async def validator_node(state: AgentState) -> dict[str, Any]:
             ),
             tools_used=tools_used,
         )
-        structured_data = structured.model_dump()
+        structured_data = structured_project.model_dump()
         final_text = content
 
     else:  # tutor
-        structured = TutorResponse(
+        structured_tutor = TutorResponse(
             content=parsed_json.get("content", content),
             concept_focus=parsed_json.get("concept_focus", "Core Module Concepts"),
             check_question=parsed_json.get(
@@ -198,8 +198,8 @@ async def validator_node(state: AgentState) -> dict[str, Any]:
             remediation_needed=bool(parsed_json.get("remediation_needed", False)),
             tools_used=tools_used,
         )
-        structured_data = structured.model_dump()
-        final_text = structured.content
+        structured_data = structured_tutor.model_dump()
+        final_text = structured_tutor.content
 
     return {
         "final_response": final_text,

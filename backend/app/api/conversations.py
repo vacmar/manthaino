@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Any, cast
 
 import redis
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -28,7 +29,7 @@ def get_conversation(
     key = f"conversations:{conversation_id}:messages"
 
     try:
-        raw_messages = cache.lrange(key, -limit, -1)
+        raw_messages = cast(list[Any], cache.lrange(key, -limit, -1))
     except Exception as e:
         logger.error(f"Redis unavailable: {e}")
         raw_messages = []
@@ -53,7 +54,7 @@ def get_conversation(
     messages = messages[-limit:]
 
     try:
-        summary = cache.get(f"conversations:{conversation_id}:summary")
+        summary = cast(str, cache.get(f"conversations:{conversation_id}:summary"))
         if not summary:
             summary = state_repo.get_conversation_summary(conversation_id)
             cache.set(f"conversations:{conversation_id}:summary", summary, ex=3600)

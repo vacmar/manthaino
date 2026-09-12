@@ -4,7 +4,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_openai import ChatOpenAI
-from pydantic import Field
+from pydantic import Field, SecretStr
 
 from app.core.config import settings
 
@@ -64,7 +64,7 @@ def get_llm(
         api_key = settings.groq_api_key or "gsk_dummy_for_testing"
         return ChatOpenAI(
             base_url=settings.groq_base_url,
-            api_key=api_key,
+            api_key=SecretStr(api_key),
             model=model or settings.groq_model,
             temperature=temp,
             timeout=settings.request_timeout,
@@ -74,7 +74,7 @@ def get_llm(
     api_key = settings.openrouter_api_key or "sk-or-dummy_for_testing"
     return ChatOpenAI(
         base_url=settings.openrouter_base_url,
-        api_key=api_key,
+        api_key=SecretStr(api_key),
         model=model or settings.default_model,
         temperature=temp,
         timeout=settings.request_timeout,

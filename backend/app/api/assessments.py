@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Any, cast
 
 import redis
 from fastapi import APIRouter, Depends, HTTPException
@@ -39,13 +40,13 @@ def submit_answer(
 ):
     key = f"assessments:active:{assessment_id}"
     try:
-        raw_state = cache.get(key)
+        raw_state = cast(str, cache.get(key))
     except Exception as e:
         logger.error(f"Redis unavailable: {e}")
         raw_state = None
 
     if not raw_state:
-        state = {"status": "in_progress", "answers": []}
+        state: dict[str, Any] = {"status": "in_progress", "answers": []}
     else:
         state = json.loads(raw_state)
 
@@ -67,12 +68,12 @@ def finalize_assessment(
 
     # 1. Read from Redis
     try:
-        raw_state = cache.get(key)
+        raw_state = cast(str, cache.get(key))
     except Exception:
         raw_state = None
 
     if raw_state:
-        state = json.loads(raw_state)
+        state: dict[str, Any] = json.loads(raw_state)
     else:
         state = {"status": "in_progress", "answers": []}
 
@@ -107,5 +108,5 @@ def get_assessment_result(assessment_id: str):
     return {
         "message": "Assessment state retrieved",
         "assessment_id": assessment_id,
-        "state": result,
+        "state": json.loads(cast(str, result)),
     }

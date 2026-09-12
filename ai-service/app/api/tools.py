@@ -12,10 +12,10 @@ def list_tools() -> list[dict[str, Any]]:
     """List all registered agent tools, their schemas, and descriptions."""
     manifest = []
     for tool_inst in ALL_TOOLS:
-        args_schema = {}
+        args_schema: dict[str, Any] = {}
         if tool_inst.args_schema:
             try:
-                args_schema = tool_inst.args_schema.model_json_schema()
+                args_schema = tool_inst.args_schema.model_json_schema()  # type: ignore
             except (AttributeError, ValueError):
                 args_schema = getattr(tool_inst, "args", {})
 

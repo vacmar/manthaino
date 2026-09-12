@@ -31,7 +31,7 @@ def evaluate_project(project_id: str, evaluation: dict) -> dict:
     derives the true passed status, and generates skill evidence if applicable.
     """
     submission_id = evaluation.get("submission_id")
-    submission = state_repo.get_project_submission(submission_id)
+    submission = state_repo.get_project_submission(str(submission_id))
     if not submission:
         raise ValueError("No submission found for this evaluation")
 

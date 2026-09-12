@@ -50,7 +50,7 @@ def get_lock_explanation(learner_id: str, node_id: str) -> dict:
     return {"locked": len(reasons) > 0, "reasons": reasons}
 
 
-def get_next_recommended_node(learner_id: str, path_id: str) -> str:
+def get_next_recommended_node(learner_id: str, path_id: str) -> str | None:
     """Ranks eligible nodes using a dependency-aware scoring formula and skips completed nodes."""
     eligible_nodes = []
 
@@ -67,10 +67,10 @@ def get_next_recommended_node(learner_id: str, path_id: str) -> str:
     # Dependency-aware scoring (mocked simple logic for MVP)
     # Higher sequence_order but prioritizing IN_PROGRESS over UNLOCKED
     best_node = None
-    best_score = -1
+    best_score: float = -1.0
 
     for node in eligible_nodes:
-        score = 0
+        score: float = 0.0
 
         # 0.35 * skill_gap_reduction (mock 1.0 for simplicity)
         score += 0.35 * 1.0
