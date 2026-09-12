@@ -1,12 +1,13 @@
-import pytest
 from unittest.mock import patch
-from fastapi.testclient import TestClient
-import json
+
 import fakeredis
-from app.main import app
+import pytest
+from fastapi.testclient import TestClient
+
 from app.core.cache import get_redis_client
+from app.main import app
+from app.models.domain import NodeStatus, PathNode
 from app.repository import state_repo
-from app.models.domain import PathNode, NodeStatus
 
 fake_redis = fakeredis.FakeRedis(decode_responses=True)
 app.dependency_overrides[get_redis_client] = lambda: fake_redis
@@ -81,8 +82,8 @@ def test_6_node_completion_ordering(mock_get_redis):
     state_repo.db["nodes"]["n1"] = PathNode(node_id="n1", path_id="p1", course_id="c1", sequence_order=1, status=NodeStatus.IN_PROGRESS)
     fake_redis.set("conversations:conv_n1:messages", "data")
     
-    from app.services.progression_service import attempt_completion
     from app.models.payloads import CompletionRequest
+    from app.services.progression_service import attempt_completion
     
     # Trigger completion
     attempt_completion("L1", "n1", CompletionRequest(learner_id="L1", assessment_score=85.0, practical_pass=True))

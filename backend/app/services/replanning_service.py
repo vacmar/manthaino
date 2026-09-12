@@ -1,17 +1,19 @@
 import uuid
-from datetime import datetime, UTC
-from typing import List, Dict, Any, Tuple
-from app.repository import state_repo
-from app.models.domain import PathNode, NodeStatus, LearningPath
+from datetime import UTC, datetime
+from typing import Any
 
-def _get_target_role_requirements(learner_id: str) -> Dict[str, float]:
+from app.models.domain import LearningPath, NodeStatus, PathNode
+from app.repository import state_repo
+
+
+def _get_target_role_requirements(learner_id: str) -> dict[str, float]:
     profile = state_repo.db.get("learner_profiles", {}).get(learner_id)
     if not profile:
         return {}
     role = state_repo.db.get("target_roles", {}).get(profile["target_role"])
     return role.get("required_skills", {}) if role else {}
 
-def _get_available_course_for_skill(skill_id: str) -> Dict[str, Any]:
+def _get_available_course_for_skill(skill_id: str) -> dict[str, Any]:
     # In MVP, assume 1 course maps to 1 skill primarily for replanning simplicity
     for course_id, course in state_repo.db.get("courses", {}).items():
         if skill_id in course.get("taught_skills", []):
@@ -22,7 +24,7 @@ def _resolve_prerequisites_recursively(
     learner_id: str, 
     required_courses: set, 
     resolved_courses: set,
-    proficiencies: Dict[str, float]
+    proficiencies: dict[str, float]
 ):
     """
     Recursively pulls in prerequisite courses if their skills aren't mastered.
@@ -43,7 +45,7 @@ def _resolve_prerequisites_recursively(
                         required_courses.add(prereq_course["course_id"])
                         added_new = True
 
-def _rank_courses(courses: List[Dict[str, Any]], proficiencies: Dict[str, float], target_reqs: Dict[str, float]) -> List[str]:
+def _rank_courses(courses: list[dict[str, Any]], proficiencies: dict[str, float], target_reqs: dict[str, float]) -> list[str]:
     """
     Ranks courses using the Phase 8 ranking logic.
     For dependencies, a simple topological sort or relying on 'prerequisite validity'
@@ -110,7 +112,7 @@ def _rank_courses(courses: List[Dict[str, Any]], proficiencies: Dict[str, float]
             
     return final_sequence
 
-def regenerate_path(learner_id: str, current_path_id: str) -> Dict[str, Any]:
+def regenerate_path(learner_id: str, current_path_id: str) -> dict[str, Any]:
     active_path = state_repo.get_active_path(learner_id)
     if not active_path:
         raise ValueError("No active path found for learner")

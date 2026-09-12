@@ -11,6 +11,8 @@ def get_path(path_id: str):
     return {"message": "Not implemented", "path_id": path_id}
 
 from pydantic import BaseModel
+
+
 class RegenerateRequest(BaseModel):
     learner_id: str
 

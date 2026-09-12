@@ -1,8 +1,9 @@
-from datetime import datetime, UTC
 import uuid
+from datetime import UTC, datetime
+
 from app.repository import state_repo
 from app.services import unlock_service
-from app.models.domain import PathNode
+
 
 def submit_project(learner_id: str, project_id: str, artifact: str) -> dict:
     project = state_repo.get_project(project_id)

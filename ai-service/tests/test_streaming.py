@@ -1,11 +1,12 @@
-import pytest
 import json
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
-from app.tools.registry import get_lesson_context, record_mistake
 from app.tools.backend_client import BackendClient
-from langchain_core.messages import AIMessageChunk
+from app.tools.registry import get_lesson_context, record_mistake
 
 client = TestClient(app)
 

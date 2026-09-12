@@ -1,8 +1,10 @@
 import json
 import logging
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+
 import redis
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
 from app.core.cache import get_redis_client
 from app.repository import state_repo
 
@@ -72,7 +74,7 @@ def finalize_assessment(assessment_id: str, cache: redis.Redis = Depends(get_red
     # 2. Persist to DB (Durable)
     try:
         state_repo.save_assessment_result(assessment_id, result)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Database write failed")
         
     # 3. Delete from Redis

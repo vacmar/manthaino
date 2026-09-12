@@ -1,7 +1,7 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from datetime import datetime
 from enum import Enum
+
+from pydantic import BaseModel
+
 
 class NodeStatus(str, Enum):
     LOCKED = "LOCKED"
@@ -31,6 +31,6 @@ class LearningPath(BaseModel):
     path_id: str
     learner_id: str
     version: int
-    previous_path_id: Optional[str] = None
+    previous_path_id: str | None = None
     created_at: str
     is_active: bool

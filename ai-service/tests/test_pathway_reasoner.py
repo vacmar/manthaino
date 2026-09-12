@@ -1,5 +1,7 @@
 import pytest
+
 from app.tools.registry import explain_pathway_change
+
 
 @pytest.mark.asyncio
 async def test_explain_pathway_receives_facts():

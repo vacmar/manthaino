@@ -1,6 +1,8 @@
 import pytest
-from app.tools.registry import evaluate_project
+
 from app.tools.backend_client import backend_client
+from app.tools.registry import evaluate_project
+
 
 @pytest.mark.asyncio
 async def test_evaluate_project_tool(monkeypatch):

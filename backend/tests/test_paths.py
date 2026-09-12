@@ -1,10 +1,11 @@
+from datetime import UTC, datetime
+
 import pytest
-import uuid
 from fastapi.testclient import TestClient
+
 from app.main import app
+from app.models.domain import LearningPath, NodeStatus, PathNode
 from app.repository import state_repo
-from app.models.domain import PathNode, NodeStatus, LearningPath
-from datetime import datetime, UTC
 
 client = TestClient(app)
 

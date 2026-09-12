@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.services import project_service
+
 from app.repository import state_repo
+from app.services import project_service
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -9,7 +10,7 @@ class ProjectSubmission(BaseModel):
     learner_id: str
     artifact: str
 
-from typing import List
+
 
 class RequirementEvaluation(BaseModel):
     requirement_id: str
@@ -25,10 +26,10 @@ class ProjectEvaluation(BaseModel):
     submission_id: str
     score: float
     passed: bool
-    requirements: List[RequirementEvaluation]
-    skills_demonstrated: List[SkillDemonstration]
-    strengths: List[str]
-    improvements: List[str]
+    requirements: list[RequirementEvaluation]
+    skills_demonstrated: list[SkillDemonstration]
+    strengths: list[str]
+    improvements: list[str]
 
 @router.get("/{project_id}")
 def get_project(project_id: str):

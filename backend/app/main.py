@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from app.api import goals, learners, assessments, paths, nodes, conversations, projects
+
+from app.api import assessments, conversations, goals, learners, nodes, paths, projects
 
 app = FastAPI(title="manthaino Backend MVP")
 

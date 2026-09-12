@@ -1,5 +1,6 @@
-from app.repository import state_repo
 from app.models.domain import NodeStatus
+from app.repository import state_repo
+
 
 def _evaluate_prereqs(learner_id: str, course_id: str) -> list:
     """Returns a list of structured lock reasons if prerequisites are unmet."""

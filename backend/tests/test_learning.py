@@ -1,15 +1,12 @@
-import pytest
 from unittest.mock import patch
-from fastapi.testclient import TestClient
-import fakeredis
-from app.main import app
-from app.core.cache import get_redis_client
-from app.repository import state_repo
 
-from tests.test_caching import fake_redis
-from app.main import app
+import pytest
+from fastapi.testclient import TestClient
+
 from app.core.cache import get_redis_client
+from app.main import app
 from app.repository import state_repo
+from tests.test_caching import fake_redis
 
 # We don't redefine fake_redis or dependency_overrides here to avoid pollution
 # It is already overridden in test_caching.py which pytest loads.

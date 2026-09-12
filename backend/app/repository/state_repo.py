@@ -1,5 +1,7 @@
-from .mock_db import db
 from app.models.domain import PathNode
+
+from .mock_db import db
+
 
 def get_node(node_id: str) -> PathNode:
     if node_id in db["nodes"]:
@@ -13,6 +15,8 @@ def get_nodes_for_path(path_id: str) -> list[PathNode]:
     return [n for n in db["nodes"].values() if n.path_id == path_id]
 
 from app.models.domain import LearningPath
+
+
 def get_active_path(learner_id: str) -> LearningPath:
     for path in db["paths"].values():
         if path.learner_id == learner_id and path.is_active:

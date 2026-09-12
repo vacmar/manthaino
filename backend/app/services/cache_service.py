@@ -1,5 +1,6 @@
 from app.core.cache import get_redis_client
 
+
 def invalidate_node_cache(node_id: str, conversation_id: str, assessment_id: str):
     """
     Invalidates conversation and assessment state from Redis.

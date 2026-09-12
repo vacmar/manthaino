@@ -1,8 +1,9 @@
-from app.models.domain import PathNode, NodeStatus
+
+from app.models.domain import NodeStatus, PathNode
 from app.models.payloads import CompletionRequest
 from app.repository import state_repo
-from app.services import progression_service, unlock_service
-import pytest
+from app.services import progression_service
+
 
 def setup_function():
     state_repo.db["nodes"].clear()

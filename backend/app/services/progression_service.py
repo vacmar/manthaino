@@ -1,9 +1,11 @@
-from datetime import datetime, UTC
-from app.models.domain import PathNode, NodeStatus
+from datetime import UTC, datetime
+
+from app.models.domain import NodeStatus
 from app.models.payloads import CompletionRequest
 from app.repository import state_repo
 from app.services import unlock_service
 from app.services.cache_service import invalidate_node_cache
+
 
 def attempt_completion(learner_id: str, node_id: str, req: CompletionRequest) -> dict:
     node = state_repo.get_node(node_id)

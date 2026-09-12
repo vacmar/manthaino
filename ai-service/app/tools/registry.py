@@ -7,6 +7,8 @@ from app.tools.schemas import (
     CalculateSkillGapsArgs,
     CheckUnlockConditionsArgs,
     CompleteLearningNodeArgs,
+    EvaluateProjectArgs,
+    ExplainPathwayChangeArgs,
     FindCoursesForSkillArgs,
     FindProjectsForSkillsArgs,
     GenerateCandidatePathsArgs,
@@ -14,16 +16,14 @@ from app.tools.schemas import (
     GetCurrentSkillStateArgs,
     GetLearnerProfileArgs,
     GetLearningNodeStateArgs,
+    GetLessonContextArgs,
     GetPrerequisitesArgs,
     GetTargetRequirementsArgs,
     GetWeakConceptsArgs,
     RankCandidatePathsArgs,
     RecordAssessmentResultArgs,
-    UpdateSkillEvidenceArgs,
-    GetLessonContextArgs,
     RecordMistakeArgs,
-    EvaluateProjectArgs,
-    ExplainPathwayChangeArgs,
+    UpdateSkillEvidenceArgs,
 )
 
 

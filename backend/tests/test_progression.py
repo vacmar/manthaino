@@ -1,8 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
+from app.models.domain import NodeStatus, PathNode
 from app.repository import state_repo
-from app.models.domain import PathNode, NodeStatus
 
 client = TestClient(app)
 

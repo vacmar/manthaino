@@ -1,9 +1,11 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
 from app.models.payloads import CompletionRequest
-from app.services import progression_service
 from app.repository import state_repo
+from app.services import progression_service
 
 router = APIRouter(prefix="/nodes", tags=["Nodes"])
 

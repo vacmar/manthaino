@@ -103,7 +103,7 @@ async def tools_node(state: AgentState) -> dict[str, Any]:
         if tool_inst:
             try:
                 result = await tool_inst.ainvoke(args)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 result = {"error": f"Tool execution failed: {e!s}"}
         else:
             result = {"error": f"Tool {name} not found"}

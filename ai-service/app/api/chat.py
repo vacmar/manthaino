@@ -1,4 +1,5 @@
 import json
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
@@ -31,7 +32,7 @@ async def _run_persona(request: ChatRequest, persona: str) -> ChatResponse:
             structured=result.get("structured_data"),
             tool_calls=result.get("tool_calls_executed", []),
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"Agent orchestration failed: {e!s}")
 
 
