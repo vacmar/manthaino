@@ -1,7 +1,7 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from datetime import datetime
 from enum import Enum
+
+from pydantic import BaseModel
+
 
 class NodeStatus(str, Enum):
     LOCKED = "LOCKED"
@@ -12,13 +12,16 @@ class NodeStatus(str, Enum):
     COMPLETED = "COMPLETED"
     REVIEW = "REVIEW"
 
+
 class Learner(BaseModel):
     learner_id: str
     name: str
 
+
 class Skill(BaseModel):
     skill_id: str
     name: str
+
 
 class PathNode(BaseModel):
     node_id: str
@@ -26,3 +29,12 @@ class PathNode(BaseModel):
     course_id: str
     sequence_order: int
     status: NodeStatus = NodeStatus.LOCKED
+
+
+class LearningPath(BaseModel):
+    path_id: str
+    learner_id: str
+    version: int
+    previous_path_id: str | None = None
+    created_at: str
+    is_active: bool

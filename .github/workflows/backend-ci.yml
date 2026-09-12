@@ -15,8 +15,27 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    - run: echo "pip install -r requirements.txt"
-    - run: echo "ruff check ."
-    - run: echo "ruff format --check ."
-    - run: echo "mypy ."
-    - run: echo "pytest"
+    - name: Install dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Lint with Ruff
+      run: |
+        cd backend
+        pip install ruff
+        ruff check .
+        ruff format --check .
+    - name: Typecheck with mypy
+      run: |
+        cd backend
+        pip install mypy
+        mypy .
+    - name: Test with pytest
+      run: |
+        cd backend
+        PYTHONPATH=. pytest -v
+    - name: Build Docker Image
+      run: |
+        cd backend
+        docker build -t manthaino-backend .

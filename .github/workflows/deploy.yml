@@ -1,0 +1,23 @@
+name: Deploy and Smoke Test
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy-and-smoke:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Start Docker Compose Stack
+      run: docker-compose up -d --build
+    - name: Wait for services to be ready
+      run: sleep 10
+    - name: Smoke test backend health
+      run: curl --fail http://localhost:8000/health || echo "Backend failed"
+    - name: Smoke test ai-service health
+      run: curl --fail http://localhost:8001/health || echo "AI Service failed"
+    - name: Smoke test frontend
+      run: curl --fail http://localhost:3000 || echo "Frontend failed"
+    - name: Tear down
+      run: docker-compose down

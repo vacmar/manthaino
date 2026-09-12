@@ -1,25 +1,90 @@
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
 from app.models.payloads import CompletionRequest
+from app.repository import state_repo
 from app.services import progression_service
 
 router = APIRouter(prefix="/nodes", tags=["Nodes"])
 
+
+class MistakePayload(BaseModel):
+    learner_id: str
+    concept: str
+    description: str
+
+
 @router.get("/{node_id}")
 def get_node(node_id: str):
-    return {"message": "Not implemented", "node_id": node_id}
+    node = state_repo.get_node(node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+    return {"node_id": node_id, "node": node.model_dump()}
+
+
+@router.get("/{node_id}/context")
+def get_node_context(node_id: str):
+    """Returns structured pedagogical context."""
+    context = state_repo.get_node_context(node_id)
+    if not context:
+        raise HTTPException(status_code=404, detail="Node context not found")
+    return context
+
+
+@router.post("/{node_id}/mistakes")
+def record_mistake(node_id: str, payload: MistakePayload):
+    """Records a learner mistake durably."""
+    timestamp = datetime.now(UTC).isoformat()
+    state_repo.record_mistake(
+        learner_id=payload.learner_id,
+        node_id=node_id,
+        concept=payload.concept,
+        description=payload.description,
+        timestamp=timestamp,
+    )
+    return {"status": "success", "recorded_at": timestamp}
+
+
+@router.get("/{node_id}/mistakes")
+def get_weak_concepts(node_id: str, learner_id: str):
+    """Aggregates mistakes into weak concepts."""
+    mistakes = state_repo.get_mistakes(learner_id, node_id)
+
+    # Simple aggregation
+    aggregation = {}
+    for m in mistakes:
+        c = m["concept"]
+        if c not in aggregation:
+            aggregation[c] = {"concept": c, "error_count": 0, "latest_description": ""}
+        aggregation[c]["error_count"] += 1
+        aggregation[c]["latest_description"] = m["description"]
+
+    return {"weak_concepts": list(aggregation.values())}
+
 
 @router.post("/{node_id}/start")
 def start_node(node_id: str):
     return {"message": "Not implemented", "node_id": node_id}
 
+
 @router.get("/{node_id}/progress")
 def get_node_progress(node_id: str):
     return {"message": "Not implemented", "node_id": node_id}
 
+
+@router.get("/{node_id}/unlock-conditions")
+def get_unlock_conditions(node_id: str, learner_id: str):
+    from app.services import unlock_service
+
+    return unlock_service.get_lock_explanation(learner_id, node_id)
+
+
 @router.post("/{node_id}/complete")
 def complete_node(node_id: str, req: CompletionRequest):
     try:
-        success = progression_service.attempt_completion(node_id, req)
-        return {"success": success}
+        result = progression_service.attempt_completion(req.learner_id, node_id, req)
+        return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

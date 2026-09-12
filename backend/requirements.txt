@@ -5,3 +5,6 @@ pyexasol
 pytest
 ruff
 mypy
+redis
+fakeredis
+httpx
