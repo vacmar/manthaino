@@ -10,7 +10,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Start Docker Compose Stack
-      run: docker-compose up -d --build
+      run: docker compose up -d --build
     - name: Wait for services to be ready
       run: sleep 10
     - name: Smoke test backend health
@@ -20,4 +20,4 @@ jobs:
     - name: Smoke test frontend
       run: curl --fail http://localhost:3000 || echo "Frontend failed"
     - name: Tear down
-      run: docker-compose down
+      run: docker compose down
