@@ -7,3 +7,4 @@ ruff
 mypy
 redis
 fakeredis
+httpx
