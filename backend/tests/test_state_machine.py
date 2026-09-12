@@ -15,13 +15,14 @@ def test_node_completion_unlocks_next():
     
     state_repo.update_node(node1)
     state_repo.update_node(node2)
-    state_repo.db["prerequisites"]["c2"] = ["c1"]
+    state_repo.db["course_skills"]["c1"] = ["skill_a"]
+    state_repo.db["prerequisites"]["c2"] = [{"skill_id": "skill_a", "required_proficiency": 0.8}]
 
     # Attempt completion (pass)
-    req = CompletionRequest(assessment_score=85.0, practical_pass=True)
-    res = progression_service.attempt_completion("n1", req)
+    req = CompletionRequest(learner_id="L1", assessment_score=85.0, practical_pass=True)
+    res = progression_service.attempt_completion("L1", "n1", req)
     
-    assert res is True
+    assert res["status"] == "COMPLETED"
     assert state_repo.get_node("n1").status == NodeStatus.COMPLETED
     assert state_repo.get_node("n2").status == NodeStatus.UNLOCKED
 
@@ -30,8 +31,8 @@ def test_node_completion_fails_threshold():
     state_repo.update_node(node1)
 
     # Attempt completion (fail score)
-    req = CompletionRequest(assessment_score=75.0, practical_pass=True)
-    res = progression_service.attempt_completion("n1", req)
+    req = CompletionRequest(learner_id="L1", assessment_score=75.0, practical_pass=True)
+    res = progression_service.attempt_completion("L1", "n1", req)
     
-    assert res is False
+    assert res["status"] == "REMEDIATION"
     assert state_repo.get_node("n1").status == NodeStatus.REMEDIATION

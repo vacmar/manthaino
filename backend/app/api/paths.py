@@ -13,3 +13,11 @@ def get_path(path_id: str):
 @router.post("/{path_id}/regenerate")
 def regenerate_path(path_id: str):
     return {"message": "Not implemented", "path_id": path_id}
+
+@router.get("/{path_id}/next-node")
+def get_next_node(path_id: str, learner_id: str):
+    from app.services import unlock_service
+    next_node = unlock_service.get_next_recommended_node(learner_id, path_id)
+    if not next_node:
+        raise HTTPException(status_code=404, detail="No eligible next node found")
+    return {"next_recommended_node": next_node}

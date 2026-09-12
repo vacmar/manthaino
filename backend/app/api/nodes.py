@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.models.payloads import CompletionRequest
@@ -30,7 +30,7 @@ def get_node_context(node_id: str):
 @router.post("/{node_id}/mistakes")
 def record_mistake(node_id: str, payload: MistakePayload):
     """Records a learner mistake durably."""
-    timestamp = datetime.utcnow().isoformat()
+    timestamp = datetime.now(UTC).isoformat()
     state_repo.record_mistake(
         learner_id=payload.learner_id,
         node_id=node_id,
@@ -64,10 +64,15 @@ def start_node(node_id: str):
 def get_node_progress(node_id: str):
     return {"message": "Not implemented", "node_id": node_id}
 
+@router.get("/{node_id}/unlock-conditions")
+def get_unlock_conditions(node_id: str, learner_id: str):
+    from app.services import unlock_service
+    return unlock_service.get_lock_explanation(learner_id, node_id)
+
 @router.post("/{node_id}/complete")
 def complete_node(node_id: str, req: CompletionRequest):
     try:
-        success = progression_service.attempt_completion(node_id, req)
-        return {"success": success}
+        result = progression_service.attempt_completion(req.learner_id, node_id, req)
+        return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

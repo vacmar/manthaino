@@ -85,7 +85,7 @@ def test_6_node_completion_ordering(mock_get_redis):
     from app.models.payloads import CompletionRequest
     
     # Trigger completion
-    attempt_completion("n1", CompletionRequest(assessment_score=85.0, practical_pass=True))
+    attempt_completion("L1", "n1", CompletionRequest(learner_id="L1", assessment_score=85.0, practical_pass=True))
     
     # Validate DB is completed
     assert state_repo.db["nodes"]["n1"].status == NodeStatus.COMPLETED

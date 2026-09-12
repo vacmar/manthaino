@@ -73,3 +73,44 @@ def get_mistakes(learner_id: str, node_id: str) -> list:
     """Retrieve mistakes for weak concept aggregation."""
     key = f"{learner_id}:{node_id}"
     return db["mistakes"].get(key, [])
+
+# --- Progression & Skills ---
+def get_course_skills(course_id: str) -> list:
+    """Get the skills taught by a course."""
+    return db["course_skills"].get(course_id, [])
+
+def get_learner_proficiency(learner_id: str, skill_id: str) -> dict:
+    """Get calculated proficiency for a learner's skill."""
+    key = f"{learner_id}:{skill_id}"
+    return db["proficiency"].get(key, {"learner_id": learner_id, "skill_id": skill_id, "proficiency": 0.0, "confidence": 0.0})
+
+def update_learner_proficiency(learner_id: str, skill_id: str, proficiency: float, confidence: float):
+    """Save calculated proficiency."""
+    key = f"{learner_id}:{skill_id}"
+    db["proficiency"][key] = {
+        "learner_id": learner_id,
+        "skill_id": skill_id,
+        "proficiency": proficiency,
+        "confidence": confidence
+    }
+
+def record_skill_evidence(learner_id: str, skill_id: str, source_type: str, source_id: str, score: float, confidence: float, timestamp: str):
+    """Durably record evidence for a skill. Enforces idempotency per source."""
+    key = f"{learner_id}:{skill_id}:{source_type}:{source_id}"
+    db["evidence"][key] = {
+        "learner_id": learner_id,
+        "skill_id": skill_id,
+        "source_type": source_type,
+        "source_id": source_id,
+        "score": score,
+        "confidence": confidence,
+        "timestamp": timestamp
+    }
+
+def get_skill_evidence(learner_id: str, skill_id: str) -> list:
+    """Get all evidence records for a specific learner and skill."""
+    records = []
+    for k, v in db["evidence"].items():
+        if v["learner_id"] == learner_id and v["skill_id"] == skill_id:
+            records.append(v)
+    return records
