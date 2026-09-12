@@ -10,9 +10,18 @@ def generate_path():
 def get_path(path_id: str):
     return {"message": "Not implemented", "path_id": path_id}
 
+from pydantic import BaseModel
+class RegenerateRequest(BaseModel):
+    learner_id: str
+
 @router.post("/{path_id}/regenerate")
-def regenerate_path(path_id: str):
-    return {"message": "Not implemented", "path_id": path_id}
+def regenerate_path(path_id: str, req: RegenerateRequest):
+    from app.services import replanning_service
+    try:
+        res = replanning_service.regenerate_path(req.learner_id, path_id)
+        return res
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/{path_id}/next-node")
 def get_next_node(path_id: str, learner_id: str):

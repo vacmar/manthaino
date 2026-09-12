@@ -26,3 +26,11 @@ class PathNode(BaseModel):
     course_id: str
     sequence_order: int
     status: NodeStatus = NodeStatus.LOCKED
+
+class LearningPath(BaseModel):
+    path_id: str
+    learner_id: str
+    version: int
+    previous_path_id: Optional[str] = None
+    created_at: str
+    is_active: bool

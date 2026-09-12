@@ -108,3 +108,9 @@ class EvaluateProjectArgs(BaseModel):
     skills_demonstrated: list[SkillDemonstration] = Field(description="Specific skills demonstrated and their scores")
     strengths: list[str] = Field(description="Identified strengths in the submission")
     improvements: list[str] = Field(description="Constructive improvements for the submission")
+
+class ExplainPathwayChangeArgs(BaseModel):
+    old_path_id: str = Field(description="The ID of the previous path")
+    new_path_id: str = Field(description="The ID of the new path version")
+    changes: list[dict] = Field(description="Structured facts detailing what nodes were added or removed")
+    proficiency_changes: list[dict] = Field(description="Structured facts detailing what skills changed")

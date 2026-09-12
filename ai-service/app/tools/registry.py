@@ -23,6 +23,7 @@ from app.tools.schemas import (
     GetLessonContextArgs,
     RecordMistakeArgs,
     EvaluateProjectArgs,
+    ExplainPathwayChangeArgs,
 )
 
 
@@ -157,6 +158,34 @@ async def evaluate_project(
     }
     return await backend_client.evaluate_project(project_id, payload)
 
+
+@tool(args_schema=ExplainPathwayChangeArgs)
+async def explain_pathway_change(
+    old_path_id: str,
+    new_path_id: str,
+    changes: list[dict],
+    proficiency_changes: list[dict]
+) -> dict[str, Any]:
+    """
+    Explain the reasons for a pathway change using strictly the provided backend facts.
+    Returns a human-readable explanation based only on the facts.
+    """
+    # For MVP, just return a structured reflection of what we would say
+    if not changes and not proficiency_changes:
+        return {"explanation": "Your path remains unchanged as there were no new eligible courses or mastered skills."}
+        
+    explanation = []
+    for p in proficiency_changes:
+        explanation.append(f"Your proficiency in {p.get('skill_id')} changed from {p.get('previous')} to {p.get('current')}.")
+        
+    for c in changes:
+        if c.get("type") == "NODE_REMOVED":
+            explanation.append(f"We removed {c.get('course_id')} because you mastered the prerequisites.")
+        elif c.get("type") == "NODE_ADDED":
+            explanation.append(f"We added {c.get('course_id')} because you are now eligible for it.")
+            
+    return {"explanation": " ".join(explanation)}
+
 ALL_TOOLS: list[BaseTool] = [
     get_learner_profile,
     get_current_skill_state,
@@ -177,6 +206,7 @@ ALL_TOOLS: list[BaseTool] = [
     check_unlock_conditions,
     complete_learning_node,
     evaluate_project,
+    explain_pathway_change,
 ]
 
 TOOLS_BY_NAME: dict[str, BaseTool] = {tool_inst.name: tool_inst for tool_inst in ALL_TOOLS}
