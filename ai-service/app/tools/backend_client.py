@@ -143,10 +143,25 @@ class BackendClient:
         )
 
     async def get_weak_concepts(self, learner_id: str, node_id: str) -> list[dict[str, Any]]:
-        return [
-            {"concept": "functools.wraps usage", "error_count": 2, "recommended_action": "Explain docstring loss"},
-            {"concept": "Decorators with arguments", "error_count": 3, "recommended_action": "Three-layer nesting drill"}
-        ]
+        resp = await self._safe_get(
+            f"/nodes/{node_id}/mistakes?learner_id={learner_id}",
+            fallback_data={"weak_concepts": []}
+        )
+        return resp.get("weak_concepts", [])
+
+    async def record_mistake(self, learner_id: str, node_id: str, concept: str, description: str) -> dict[str, Any]:
+        payload = {"learner_id": learner_id, "concept": concept, "description": description}
+        return await self._safe_post(
+            f"/nodes/{node_id}/mistakes",
+            payload,
+            fallback_data={"status": "recorded"}
+        )
+
+    async def get_lesson_context(self, node_id: str) -> dict[str, Any]:
+        return await self._safe_get(
+            f"/nodes/{node_id}/context",
+            fallback_data={"lesson": "Lesson context not available in DB.", "concepts": []}
+        )
 
     async def record_assessment_result(self, learner_id: str, assessment_id: str, score: float, passed: bool) -> dict[str, Any]:
         payload = {"score": score, "passed": passed}

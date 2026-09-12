@@ -20,6 +20,8 @@ from app.tools.schemas import (
     RankCandidatePathsArgs,
     RecordAssessmentResultArgs,
     UpdateSkillEvidenceArgs,
+    GetLessonContextArgs,
+    RecordMistakeArgs,
 )
 
 
@@ -119,6 +121,18 @@ async def complete_learning_node(node_id: str, assessment_score: float, practica
     return await backend_client.complete_learning_node(node_id, assessment_score, practical_pass)
 
 
+@tool(args_schema=GetLessonContextArgs)
+async def get_lesson_context(node_id: str) -> dict[str, Any]:
+    """Retrieve structured pedagogical context for a node including lessons, exercises, and hints."""
+    return await backend_client.get_lesson_context(node_id)
+
+
+@tool(args_schema=RecordMistakeArgs)
+async def record_mistake(learner_id: str, node_id: str, concept: str, description: str) -> dict[str, Any]:
+    """Record a conceptual mistake made by the learner for future remediation."""
+    return await backend_client.record_mistake(learner_id, node_id, concept, description)
+
+
 ALL_TOOLS: list[BaseTool] = [
     get_learner_profile,
     get_current_skill_state,
@@ -132,6 +146,8 @@ ALL_TOOLS: list[BaseTool] = [
     get_learning_node_state,
     get_conversation_context,
     get_weak_concepts,
+    get_lesson_context,
+    record_mistake,
     record_assessment_result,
     update_skill_evidence,
     check_unlock_conditions,

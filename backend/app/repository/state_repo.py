@@ -30,6 +30,16 @@ def save_conversation_message(conversation_id: str, message: dict):
         db["conversations"][conversation_id] = []
     db["conversations"][conversation_id].append(message)
 
+def get_conversation_summary(conversation_id: str) -> str:
+    """Read durable summary"""
+    return db.get("summaries", {}).get(conversation_id, "No summary available.")
+
+def save_conversation_summary(conversation_id: str, summary: str):
+    """Write durable summary"""
+    if "summaries" not in db:
+        db["summaries"] = {}
+    db["summaries"][conversation_id] = summary
+
 # --- Assessments ---
 def get_assessment(assessment_id: str) -> dict:
     """Read final assessment result from DB"""
@@ -38,3 +48,28 @@ def get_assessment(assessment_id: str) -> dict:
 def save_assessment_result(assessment_id: str, state: dict):
     """Write final assessment durably to DB"""
     db["assessments"][assessment_id] = state
+
+# --- Lessons & Context ---
+def get_node_context(node_id: str) -> dict:
+    """Read structured pedagogical context for a node."""
+    return db["lessons"].get(node_id, {})
+
+# --- Mistakes ---
+def record_mistake(learner_id: str, node_id: str, concept: str, description: str, timestamp: str):
+    """Record a mistake durably."""
+    key = f"{learner_id}:{node_id}"
+    if key not in db["mistakes"]:
+        db["mistakes"][key] = []
+    
+    db["mistakes"][key].append({
+        "learner_id": learner_id,
+        "node_id": node_id,
+        "concept": concept,
+        "description": description,
+        "timestamp": timestamp
+    })
+
+def get_mistakes(learner_id: str, node_id: str) -> list:
+    """Retrieve mistakes for weak concept aggregation."""
+    key = f"{learner_id}:{node_id}"
+    return db["mistakes"].get(key, [])

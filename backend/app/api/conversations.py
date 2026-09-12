@@ -1,5 +1,5 @@
 import json
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 import redis
 import logging
@@ -26,31 +26,30 @@ def get_conversation(conversation_id: str, limit: int = 10, cache: redis.Redis =
         
     messages = []
     if raw_messages:
-        # Cache hit
         for rm in raw_messages:
             try:
                 messages.append(json.loads(rm))
             except json.JSONDecodeError:
                 pass
     else:
-        # Cache miss or Redis failure -> DB Fallback
         messages = state_repo.get_conversation(conversation_id)
         if messages:
             try:
-                # Populate cache
                 for m in messages:
                     cache.rpush(key, json.dumps(m))
-                cache.expire(key, 3600)  # 1 hour TTL
+                cache.expire(key, 3600)
             except Exception as e:
                 logger.error(f"Failed to populate Redis cache: {e}")
         
-    # Respect limit for DB fallback too
     messages = messages[-limit:]
             
     try:
-        summary = cache.get(f"conversations:{conversation_id}:summary") or "No summary available."
+        summary = cache.get(f"conversations:{conversation_id}:summary")
+        if not summary:
+            summary = state_repo.get_conversation_summary(conversation_id)
+            cache.set(f"conversations:{conversation_id}:summary", summary, ex=3600)
     except Exception:
-        summary = "No summary available."
+        summary = state_repo.get_conversation_summary(conversation_id)
     
     return {
         "conversation_id": conversation_id,
@@ -58,8 +57,24 @@ def get_conversation(conversation_id: str, limit: int = 10, cache: redis.Redis =
         "recent_messages": messages
     }
 
+def generate_rolling_summary(conversation_id: str):
+    """Background task to generate a new summary based on history."""
+    messages = state_repo.get_conversation(conversation_id)
+    old_summary = state_repo.get_conversation_summary(conversation_id)
+    
+    # Mock summarization logic (in production, call LLM)
+    new_summary = f"{old_summary} | Summarized {len(messages)} messages at {len(messages)}."
+    
+    # Persist and update cache
+    state_repo.save_conversation_summary(conversation_id, new_summary)
+    try:
+        cache = get_redis_client()
+        cache.set(f"conversations:{conversation_id}:summary", new_summary, ex=3600)
+    except Exception:
+        pass
+
 @router.post("/{conversation_id}/messages")
-def add_message(conversation_id: str, payload: MessagePayload, cache: redis.Redis = Depends(get_redis_client)):
+def add_message(conversation_id: str, payload: MessagePayload, background_tasks: BackgroundTasks, cache: redis.Redis = Depends(get_redis_client)):
     key = f"conversations:{conversation_id}:messages"
     msg_dict = payload.model_dump()
     
@@ -73,9 +88,16 @@ def add_message(conversation_id: str, payload: MessagePayload, cache: redis.Redi
     try:
         message_str = json.dumps(msg_dict)
         cache.rpush(key, message_str)
-        cache.expire(key, 3600)  # Reset TTL
+        cache.expire(key, 3600)
     except Exception as e:
         logger.error(f"Failed to update Redis cache: {e}")
-        # We don't fail the request because DB write succeeded!
+        
+    # 3. Rolling Summary check
+    try:
+        msg_count = len(state_repo.get_conversation(conversation_id))
+        if msg_count > 0 and msg_count % 5 == 0:
+            background_tasks.add_task(generate_rolling_summary, conversation_id)
+    except Exception as e:
+        logger.error(f"Failed to trigger summarization: {e}")
     
     return {"status": "success", "conversation_id": conversation_id}

@@ -79,3 +79,12 @@ class CompleteLearningNodeArgs(BaseModel):
     node_id: str = Field(description="Unique identifier of the node to transition to COMPLETED")
     assessment_score: float = Field(description="Final assessment score achieved")
     practical_pass: bool = Field(description="Whether practical implementation task was passed")
+
+class GetLessonContextArgs(BaseModel):
+    node_id: str = Field(description="Unique identifier of the path learning node to fetch pedagogical content for")
+
+class RecordMistakeArgs(BaseModel):
+    learner_id: str = Field(description="Unique identifier of the learner")
+    node_id: str = Field(description="Path node identifier")
+    concept: str = Field(description="The underlying concept the learner struggled with (e.g. 'functools.wraps')")
+    description: str = Field(description="Detailed description of the mistake or misunderstanding")
