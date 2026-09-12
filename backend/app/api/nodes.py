@@ -9,10 +9,12 @@ from app.services import progression_service
 
 router = APIRouter(prefix="/nodes", tags=["Nodes"])
 
+
 class MistakePayload(BaseModel):
     learner_id: str
     concept: str
     description: str
+
 
 @router.get("/{node_id}")
 def get_node(node_id: str):
@@ -21,6 +23,7 @@ def get_node(node_id: str):
         raise HTTPException(status_code=404, detail="Node not found")
     return {"node_id": node_id, "node": node.model_dump()}
 
+
 @router.get("/{node_id}/context")
 def get_node_context(node_id: str):
     """Returns structured pedagogical context."""
@@ -28,6 +31,7 @@ def get_node_context(node_id: str):
     if not context:
         raise HTTPException(status_code=404, detail="Node context not found")
     return context
+
 
 @router.post("/{node_id}/mistakes")
 def record_mistake(node_id: str, payload: MistakePayload):
@@ -38,15 +42,16 @@ def record_mistake(node_id: str, payload: MistakePayload):
         node_id=node_id,
         concept=payload.concept,
         description=payload.description,
-        timestamp=timestamp
+        timestamp=timestamp,
     )
     return {"status": "success", "recorded_at": timestamp}
+
 
 @router.get("/{node_id}/mistakes")
 def get_weak_concepts(node_id: str, learner_id: str):
     """Aggregates mistakes into weak concepts."""
     mistakes = state_repo.get_mistakes(learner_id, node_id)
-    
+
     # Simple aggregation
     aggregation = {}
     for m in mistakes:
@@ -55,21 +60,26 @@ def get_weak_concepts(node_id: str, learner_id: str):
             aggregation[c] = {"concept": c, "error_count": 0, "latest_description": ""}
         aggregation[c]["error_count"] += 1
         aggregation[c]["latest_description"] = m["description"]
-        
+
     return {"weak_concepts": list(aggregation.values())}
+
 
 @router.post("/{node_id}/start")
 def start_node(node_id: str):
     return {"message": "Not implemented", "node_id": node_id}
 
+
 @router.get("/{node_id}/progress")
 def get_node_progress(node_id: str):
     return {"message": "Not implemented", "node_id": node_id}
 
+
 @router.get("/{node_id}/unlock-conditions")
 def get_unlock_conditions(node_id: str, learner_id: str):
     from app.services import unlock_service
+
     return unlock_service.get_lock_explanation(learner_id, node_id)
+
 
 @router.post("/{node_id}/complete")
 def complete_node(node_id: str, req: CompletionRequest):

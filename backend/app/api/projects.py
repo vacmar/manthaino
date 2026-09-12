@@ -6,10 +6,10 @@ from app.services import project_service
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
+
 class ProjectSubmission(BaseModel):
     learner_id: str
     artifact: str
-
 
 
 class RequirementEvaluation(BaseModel):
@@ -17,10 +17,12 @@ class RequirementEvaluation(BaseModel):
     status: str
     evidence: str
 
+
 class SkillDemonstration(BaseModel):
     skill_id: str
     score: float
     confidence: float
+
 
 class ProjectEvaluation(BaseModel):
     submission_id: str
@@ -31,12 +33,14 @@ class ProjectEvaluation(BaseModel):
     strengths: list[str]
     improvements: list[str]
 
+
 @router.get("/{project_id}")
 def get_project(project_id: str):
     project = state_repo.get_project(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return {"project_id": project_id, "project": project}
+
 
 @router.post("/{project_id}/submit")
 def submit_project(project_id: str, req: ProjectSubmission):
@@ -45,6 +49,7 @@ def submit_project(project_id: str, req: ProjectSubmission):
         return res
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
 
 @router.post("/{project_id}/evaluate")
 def evaluate_project(project_id: str, req: ProjectEvaluation):

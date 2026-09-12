@@ -33,7 +33,9 @@ def test_tool_metadata_validity():
     for tool_inst in ALL_TOOLS:
         assert tool_inst.name, "Tool must have a valid name"
         assert tool_inst.description, f"Tool {tool_inst.name} missing description"
-        assert tool_inst.args_schema is not None, f"Tool {tool_inst.name} missing args_schema"
+        assert tool_inst.args_schema is not None, (
+            f"Tool {tool_inst.name} missing args_schema"
+        )
         schema_dict = tool_inst.args_schema.model_json_schema()
         assert "properties" in schema_dict
 
@@ -41,20 +43,24 @@ def test_tool_metadata_validity():
 @pytest.mark.asyncio
 async def test_tool_invocations():
     # Test read tools
-    profile = await TOOLS_BY_NAME["get_learner_profile"].ainvoke({"learner_id": "l_test_01"})
+    profile = await TOOLS_BY_NAME["get_learner_profile"].ainvoke(
+        {"learner_id": "l_test_01"}
+    )
     assert "learner_id" in profile
 
-    gaps = await TOOLS_BY_NAME["calculate_skill_gaps"].ainvoke({"learner_id": "l_test_01", "role_id": "r_de_01"})
+    gaps = await TOOLS_BY_NAME["calculate_skill_gaps"].ainvoke(
+        {"learner_id": "l_test_01", "role_id": "r_de_01"}
+    )
     assert isinstance(gaps, list)
     assert len(gaps) > 0
 
-    node_state = await TOOLS_BY_NAME["get_learning_node_state"].ainvoke({"node_id": "node_py_01"})
+    node_state = await TOOLS_BY_NAME["get_learning_node_state"].ainvoke(
+        {"node_id": "node_py_01"}
+    )
     assert "status" in node_state
 
     # Test state transition tool
-    completion_res = await TOOLS_BY_NAME["complete_learning_node"].ainvoke({
-        "node_id": "node_py_01",
-        "assessment_score": 0.85,
-        "practical_pass": True
-    })
+    completion_res = await TOOLS_BY_NAME["complete_learning_node"].ainvoke(
+        {"node_id": "node_py_01", "assessment_score": 0.85, "practical_pass": True}
+    )
     assert completion_res.get("success") is True

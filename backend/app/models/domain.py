@@ -12,13 +12,16 @@ class NodeStatus(str, Enum):
     COMPLETED = "COMPLETED"
     REVIEW = "REVIEW"
 
+
 class Learner(BaseModel):
     learner_id: str
     name: str
 
+
 class Skill(BaseModel):
     skill_id: str
     name: str
+
 
 class PathNode(BaseModel):
     node_id: str
@@ -26,6 +29,7 @@ class PathNode(BaseModel):
     course_id: str
     sequence_order: int
     status: NodeStatus = NodeStatus.LOCKED
+
 
 class LearningPath(BaseModel):
     path_id: str

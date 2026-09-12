@@ -8,7 +8,7 @@ from app.tools.registry import ALL_TOOLS
 app = FastAPI(
     title=settings.app_name,
     description="Adaptive AI Tutor, Pathway Reasoner, and Project Mentor Orchestrator for manthaino",
-    version="0.1.0"
+    version="0.1.0",
 )
 
 # Enable CORS for Next.js frontend communication

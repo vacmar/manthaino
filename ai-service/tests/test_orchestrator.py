@@ -6,7 +6,9 @@ from app.orchestrator.graph import build_agent_graph
 
 @pytest.mark.asyncio
 async def test_orchestrator_direct_response():
-    mock_llm = MockChatModel(response_content="A generator uses the yield keyword to produce values lazily.")
+    mock_llm = MockChatModel(
+        response_content="A generator uses the yield keyword to produce values lazily."
+    )
     graph = build_agent_graph(custom_llm=mock_llm)
 
     state = {
@@ -25,7 +27,10 @@ async def test_orchestrator_direct_response():
     }
     result = await graph.ainvoke(state)
 
-    assert result["final_response"] == "A generator uses the yield keyword to produce values lazily."
+    assert (
+        result["final_response"]
+        == "A generator uses the yield keyword to produce values lazily."
+    )
     assert len(result["tool_calls_executed"]) == 0
     assert result["structured_data"] is not None
     assert result["structured_data"]["concept_focus"] == "Core Module Concepts"
@@ -33,14 +38,16 @@ async def test_orchestrator_direct_response():
 
 @pytest.mark.asyncio
 async def test_orchestrator_with_tool_call_loop():
-    mock_tool_call = [{
-        "name": "calculate_skill_gaps",
-        "args": {"learner_id": "l_test_01", "role_id": "role_de_01"},
-        "id": "call_gaps_1",
-    }]
+    mock_tool_call = [
+        {
+            "name": "calculate_skill_gaps",
+            "args": {"learner_id": "l_test_01", "role_id": "role_de_01"},
+            "id": "call_gaps_1",
+        }
+    ]
     mock_llm = MockChatModel(
         response_content="Your primary skill gaps are Distributed Systems and Data Modeling.",
-        tool_calls_sequence=[mock_tool_call]
+        tool_calls_sequence=[mock_tool_call],
     )
     graph = build_agent_graph(custom_llm=mock_llm)
 
@@ -68,14 +75,21 @@ async def test_orchestrator_with_tool_call_loop():
 
 @pytest.mark.asyncio
 async def test_orchestrator_project_mentor_evaluation():
-    mock_tool_call = [{
-        "name": "update_skill_evidence",
-        "args": {"learner_id": "l_test_01", "skill_id": "skill_py", "score": 0.9, "source_type": "PRACTICAL"},
-        "id": "call_ev_1",
-    }]
+    mock_tool_call = [
+        {
+            "name": "update_skill_evidence",
+            "args": {
+                "learner_id": "l_test_01",
+                "skill_id": "skill_py",
+                "score": 0.9,
+                "source_type": "PRACTICAL",
+            },
+            "id": "call_ev_1",
+        }
+    ]
     mock_llm = MockChatModel(
         response_content="Excellent implementation of the custom iterator. Passed all test assertions.",
-        tool_calls_sequence=[mock_tool_call]
+        tool_calls_sequence=[mock_tool_call],
     )
     graph = build_agent_graph(custom_llm=mock_llm)
 

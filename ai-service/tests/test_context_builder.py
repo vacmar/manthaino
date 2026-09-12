@@ -38,7 +38,10 @@ async def test_context_builder_with_history():
     builder = ContextBuilder()
     history = [
         {"role": "user", "content": "What is a closure?"},
-        {"role": "assistant", "content": "A closure is a nested function that remembers enclosing scope values."}
+        {
+            "role": "assistant",
+            "content": "A closure is a nested function that remembers enclosing scope values.",
+        },
     ]
     messages = await builder.build_messages(
         persona="tutor",
@@ -47,5 +50,8 @@ async def test_context_builder_with_history():
     )
     assert len(messages) == 4
     assert messages[1].content == "What is a closure?"
-    assert messages[2].content == "A closure is a nested function that remembers enclosing scope values."
+    assert (
+        messages[2].content
+        == "A closure is a nested function that remembers enclosing scope values."
+    )
     assert messages[3].content == "Can you give an example?"

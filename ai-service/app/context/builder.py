@@ -38,12 +38,22 @@ class ContextBuilder:
         if node_id:
             node_state = await self.backend.get_learning_node_state(node_id)
             weak_concepts = await self.backend.get_weak_concepts(learner_id, node_id)
-            state_lines.append(f"Active Course/Node: {node_state.get('course_title', node_id)}")
-            state_lines.append(f"Current Module: {node_state.get('current_module', 'General')}")
-            state_lines.append(f"Current Concept: {node_state.get('current_concept', 'Overview')}")
-            state_lines.append(f"Progress: {node_state.get('progress_percentage', 0.0)}%")
+            state_lines.append(
+                f"Active Course/Node: {node_state.get('course_title', node_id)}"
+            )
+            state_lines.append(
+                f"Current Module: {node_state.get('current_module', 'General')}"
+            )
+            state_lines.append(
+                f"Current Concept: {node_state.get('current_concept', 'Overview')}"
+            )
+            state_lines.append(
+                f"Progress: {node_state.get('progress_percentage', 0.0)}%"
+            )
             if weak_concepts:
-                weak_names = [c.get("concept", "") for c in weak_concepts if c.get("concept")]
+                weak_names = [
+                    c.get("concept", "") for c in weak_concepts if c.get("concept")
+                ]
                 state_lines.append(f"Target Weak Concepts: {', '.join(weak_names)}")
 
         if role_id:
@@ -52,7 +62,9 @@ class ContextBuilder:
         summary_text = ""
         recent_context_msgs: list[BaseMessage] = []
         if conversation_id:
-            conv_data = await self.backend.get_conversation_context(conversation_id, limit=5)
+            conv_data = await self.backend.get_conversation_context(
+                conversation_id, limit=5
+            )
             summary_text = conv_data.get("summary", "")
             for m in conv_data.get("recent_messages", []):
                 role = m.get("role")
@@ -67,7 +79,9 @@ class ContextBuilder:
 
         # 3. Assemble system message with grounded state block
         state_block = "\n".join(state_lines)
-        full_system_text = f"{base_prompt}\n\n[AUTHORITATIVE STATE CONTEXT]\n{state_block}"
+        full_system_text = (
+            f"{base_prompt}\n\n[AUTHORITATIVE STATE CONTEXT]\n{state_block}"
+        )
         messages: list[BaseMessage] = [SystemMessage(content=full_system_text)]
 
         # 4. Append historical context messages (from caller or backend)

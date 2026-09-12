@@ -11,7 +11,7 @@ def attempt_completion(learner_id: str, node_id: str, req: CompletionRequest) ->
     node = state_repo.get_node(node_id)
     if not node:
         raise ValueError("Node not found")
-        
+
     # Idempotency check
     if node.status == NodeStatus.COMPLETED:
         unlocked = unlock_service.check_unlocks(learner_id, node.path_id)
@@ -21,29 +21,33 @@ def attempt_completion(learner_id: str, node_id: str, req: CompletionRequest) ->
             "status": "COMPLETED",
             "skills_updated": [],
             "unlocked_nodes": unlocked,
-            "next_recommended_node": next_node
+            "next_recommended_node": next_node,
         }
-        
+
     skills_updated = []
-        
+
     # Rules: Assessment >= 80% and practical pass
     if req.assessment_score >= 80.0 and req.practical_pass:
         # 1. Update Node Status
         node.status = NodeStatus.COMPLETED
         state_repo.update_node(node)
-        
+
         # 2. Record Evidence & Recalculate Proficiency
         # In a real system with SQL, this block would be wrapped in a DB transaction
         skills = state_repo.get_course_skills(node.course_id)
         timestamp = datetime.now(UTC).isoformat()
-        
+
         for skill_id in skills:
             # Get existing proficiency
             old_prof_obj = state_repo.get_learner_proficiency(learner_id, skill_id)
             old_prof = old_prof_obj["proficiency"]
-            
+
             # Record new evidence
-            new_evidence_score = req.assessment_score / 100.0 if req.assessment_score > 1.0 else req.assessment_score
+            new_evidence_score = (
+                req.assessment_score / 100.0
+                if req.assessment_score > 1.0
+                else req.assessment_score
+            )
             state_repo.record_skill_evidence(
                 learner_id=learner_id,
                 skill_id=skill_id,
@@ -51,53 +55,55 @@ def attempt_completion(learner_id: str, node_id: str, req: CompletionRequest) ->
                 source_id=node_id,
                 score=new_evidence_score,
                 confidence=0.8,
-                timestamp=timestamp
+                timestamp=timestamp,
             )
-            
+
             # Simplified mock fusion: just take the max for MVP
             new_prof = max(old_prof, new_evidence_score)
-            
+
             state_repo.update_learner_proficiency(
                 learner_id=learner_id,
                 skill_id=skill_id,
                 proficiency=new_prof,
-                confidence=0.8
+                confidence=0.8,
             )
-            
-            skills_updated.append({
-                "skill_id": skill_id,
-                "previous_proficiency": old_prof,
-                "new_proficiency": new_prof
-            })
-        
+
+            skills_updated.append(
+                {
+                    "skill_id": skill_id,
+                    "previous_proficiency": old_prof,
+                    "new_proficiency": new_prof,
+                }
+            )
+
         # 3. Check downstream unlocks based on new skill proficiencies
         unlocked_nodes = unlock_service.check_unlocks(learner_id, node.path_id)
-        
+
         # 4. Recommend Next Node
         next_node = unlock_service.get_next_recommended_node(learner_id, node.path_id)
-        
+
         # Trigger cache invalidate (After DB commit)
         invalidate_node_cache(
-            node_id=node_id, 
-            conversation_id=f"conv_{node_id}", 
-            assessment_id=f"assess_{node_id}"
+            node_id=node_id,
+            conversation_id=f"conv_{node_id}",
+            assessment_id=f"assess_{node_id}",
         )
-        
+
         return {
             "node_id": node_id,
             "status": "COMPLETED",
             "skills_updated": skills_updated,
             "unlocked_nodes": unlocked_nodes,
-            "next_recommended_node": next_node
+            "next_recommended_node": next_node,
         }
-        
+
     node.status = NodeStatus.REMEDIATION
     state_repo.update_node(node)
-    
+
     return {
         "node_id": node_id,
         "status": "REMEDIATION",
         "skills_updated": [],
         "unlocked_nodes": [],
-        "next_recommended_node": None
+        "next_recommended_node": None,
     }

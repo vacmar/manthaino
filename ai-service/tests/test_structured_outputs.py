@@ -28,7 +28,7 @@ def test_pathway_explanation_model():
         stage_number=1,
         course_name="Introduction to Python",
         rationale="Builds language syntax foundations",
-        target_skills=["Python"]
+        target_skills=["Python"],
     )
     explanation = PathwayExplanation(
         summary="Optimal pathway for Data Engineer",
@@ -66,7 +66,7 @@ def test_api_chat_endpoints():
     tutor_payload = {
         "message": "Explain closures",
         "learner_id": "learner_test",
-        "node_id": "node_py_01"
+        "node_id": "node_py_01",
     }
     resp = client.post("/chat/tutor", json=tutor_payload)
     assert resp.status_code == 200
@@ -79,7 +79,7 @@ def test_api_chat_endpoints():
     pathway_payload = {
         "message": "Why this path?",
         "learner_id": "learner_test",
-        "role_id": "Data Engineer"
+        "role_id": "Data Engineer",
     }
     resp = client.post("/chat/pathway-explanation", json=pathway_payload)
     assert resp.status_code == 200
@@ -90,7 +90,7 @@ def test_api_chat_endpoints():
     mentor_payload = {
         "message": "Review my solution",
         "learner_id": "learner_test",
-        "project_id": "proj_etl_01"
+        "project_id": "proj_etl_01",
     }
     resp = client.post("/chat/project-mentor", json=mentor_payload)
     assert resp.status_code == 200

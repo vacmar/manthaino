@@ -81,7 +81,9 @@ def router_edge(state: AgentState) -> str:
         return "validator_node"
 
     last_message = state["messages"][-1]
-    if isinstance(last_message, AIMessage) and getattr(last_message, "tool_calls", None):
+    if isinstance(last_message, AIMessage) and getattr(
+        last_message, "tool_calls", None
+    ):
         return "tools_node"
     return "validator_node"
 
@@ -108,7 +110,9 @@ async def tools_node(state: AgentState) -> dict[str, Any]:
         else:
             result = {"error": f"Tool {name} not found"}
 
-        tool_messages.append(ToolMessage(content=json.dumps(result), tool_call_id=call_id))
+        tool_messages.append(
+            ToolMessage(content=json.dumps(result), tool_call_id=call_id)
+        )
         executed_records.append({"tool": name, "args": args, "result": result})
 
     return {"messages": tool_messages, "tool_calls_executed": executed_records}
@@ -117,7 +121,9 @@ async def tools_node(state: AgentState) -> dict[str, Any]:
 async def validator_node(state: AgentState) -> dict[str, Any]:
     """Parse and normalize final output into structured Pydantic schemas."""
     last_message = state["messages"][-1]
-    content = str(last_message.content) if last_message.content else "Response generated."
+    content = (
+        str(last_message.content) if last_message.content else "Response generated."
+    )
     persona = state.get("persona", "tutor")
     tools_used = [t["tool"] for t in state.get("tool_calls_executed", [])]
 
@@ -126,12 +132,27 @@ async def validator_node(state: AgentState) -> dict[str, Any]:
 
     if persona == "pathway_reasoner":
         stages_raw = parsed_json.get("stages", [])
-        stages = [PathwayStage(**s) if isinstance(s, dict) else PathwayStage(stage_number=i+1, course_name=str(s), rationale="Curriculum progression", target_skills=[]) for i, s in enumerate(stages_raw)]
+        stages = [
+            PathwayStage(**s)
+            if isinstance(s, dict)
+            else PathwayStage(
+                stage_number=i + 1,
+                course_name=str(s),
+                rationale="Curriculum progression",
+                target_skills=[],
+            )
+            for i, s in enumerate(stages_raw)
+        ]
         structured = PathwayExplanation(
             summary=parsed_json.get("summary", content),
-            target_role=parsed_json.get("target_role", state.get("role_id") or "Target Role"),
+            target_role=parsed_json.get(
+                "target_role", state.get("role_id") or "Target Role"
+            ),
             stages=stages,
-            gap_analysis_summary=parsed_json.get("gap_analysis_summary", "Curriculum closes prerequisites and skill gaps."),
+            gap_analysis_summary=parsed_json.get(
+                "gap_analysis_summary",
+                "Curriculum closes prerequisites and skill gaps.",
+            ),
             estimated_total_hours=float(parsed_json.get("estimated_total_hours", 40.0)),
             tools_used=tools_used,
         )
@@ -140,12 +161,24 @@ async def validator_node(state: AgentState) -> dict[str, Any]:
 
     elif persona == "project_mentor":
         structured = ProjectMentorFeedback(
-            project_title=parsed_json.get("project_title", state.get("project_id") or "Practical Capstone"),
+            project_title=parsed_json.get(
+                "project_title", state.get("project_id") or "Practical Capstone"
+            ),
             passed=bool(parsed_json.get("passed", True)),
             score=float(parsed_json.get("score", 0.85)),
-            strengths=parsed_json.get("strengths", ["Clear functional separation", "Effective prerequisite concept application"]),
-            areas_for_improvement=parsed_json.get("areas_for_improvement", ["Add error handling for edge cases"]),
-            next_milestone=parsed_json.get("next_milestone", "Proceed to integration testing"),
+            strengths=parsed_json.get(
+                "strengths",
+                [
+                    "Clear functional separation",
+                    "Effective prerequisite concept application",
+                ],
+            ),
+            areas_for_improvement=parsed_json.get(
+                "areas_for_improvement", ["Add error handling for edge cases"]
+            ),
+            next_milestone=parsed_json.get(
+                "next_milestone", "Proceed to integration testing"
+            ),
             tools_used=tools_used,
         )
         structured_data = structured.model_dump()
@@ -155,8 +188,13 @@ async def validator_node(state: AgentState) -> dict[str, Any]:
         structured = TutorResponse(
             content=parsed_json.get("content", content),
             concept_focus=parsed_json.get("concept_focus", "Core Module Concepts"),
-            check_question=parsed_json.get("check_question", "Would you like to try a code exercise to verify this?"),
-            recommended_action=parsed_json.get("recommended_action", "practice_exercise"),
+            check_question=parsed_json.get(
+                "check_question",
+                "Would you like to try a code exercise to verify this?",
+            ),
+            recommended_action=parsed_json.get(
+                "recommended_action", "practice_exercise"
+            ),
             remediation_needed=bool(parsed_json.get("remediation_needed", False)),
             tools_used=tools_used,
         )
@@ -186,7 +224,7 @@ def build_agent_graph(custom_llm=None):
     graph_builder.add_conditional_edges(
         "agent_node",
         router_edge,
-        {"tools_node": "tools_node", "validator_node": "validator_node"}
+        {"tools_node": "tools_node", "validator_node": "validator_node"},
     )
     graph_builder.add_edge("tools_node", "agent_node")
     graph_builder.add_edge("validator_node", END)

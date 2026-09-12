@@ -11,7 +11,10 @@ from app.core.config import settings
 
 class MockChatModel(BaseChatModel):
     """Deterministic mock LLM for offline testing and CI workflows."""
-    response_content: str = Field(default="Adaptive guidance generated from grounded pathway state.")
+
+    response_content: str = Field(
+        default="Adaptive guidance generated from grounded pathway state."
+    )
     tool_calls_sequence: list[list[dict]] = Field(default_factory=list)
     call_count: int = Field(default=0)
 
@@ -20,7 +23,7 @@ class MockChatModel(BaseChatModel):
         messages: list[BaseMessage],
         stop: list[str] | None = None,
         run_manager: Any = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> ChatResult:
         tool_calls = []
         if self.call_count < len(self.tool_calls_sequence):
@@ -54,7 +57,7 @@ def get_llm(
     if selected_provider == "mock":
         return MockChatModel(
             response_content=mock_response or "Grounded educational feedback.",
-            tool_calls_sequence=mock_tool_calls or []
+            tool_calls_sequence=mock_tool_calls or [],
         )
 
     if selected_provider == "groq":

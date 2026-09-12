@@ -33,7 +33,9 @@ async def _run_persona(request: ChatRequest, persona: str) -> ChatResponse:
             tool_calls=result.get("tool_calls_executed", []),
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Agent orchestration failed: {e!s}")
+        raise HTTPException(
+            status_code=500, detail=f"Agent orchestration failed: {e!s}"
+        )
 
 
 async def _stream_persona(request: ChatRequest, persona: str):
@@ -51,12 +53,12 @@ async def _stream_persona(request: ChatRequest, persona: str):
         "structured_data": None,
         "loop_count": 0,
     }
-    
+
     try:
         async for event in orchestrator_graph.astream_events(init_state, version="v1"):
             kind = event["event"]
             name = event.get("name", "")
-            
+
             # Stream tokens
             if kind == "on_chat_model_stream":
                 chunk = event["data"]["chunk"]
@@ -64,12 +66,14 @@ async def _stream_persona(request: ChatRequest, persona: str):
                     content = chunk.content
                     if isinstance(content, str) and content:
                         # Yield SSE token
-                        clean_text = content.replace("\n", "\\n") # basic escaping for SSE data single line if needed, but SSE supports multiline if we prefix `data: `
+                        clean_text = content.replace(
+                            "\n", "\\n"
+                        )  # basic escaping for SSE data single line if needed, but SSE supports multiline if we prefix `data: `
                         # Actually standard SSE handles multiline by repeating `data: `
                         lines = content.split("\n")
                         sse_data = "\n".join([f"data: {line}" for line in lines])
                         yield f"event: token\n{sse_data}\n\n"
-                        
+
             # Stream final metadata when validator completes
             elif kind == "on_chain_end" and name == "validator_node":
                 output = event["data"].get("output", {})
@@ -77,7 +81,7 @@ async def _stream_persona(request: ChatRequest, persona: str):
                 if structured:
                     meta_json = json.dumps(structured)
                     yield f"event: metadata\ndata: {meta_json}\n\n"
-                    
+
         # Signal completion
         yield "event: done\ndata: {}\n\n"
     except Exception as e:
@@ -87,7 +91,9 @@ async def _stream_persona(request: ChatRequest, persona: str):
 @router.post("/tutor/stream")
 async def stream_tutor(request: ChatRequest):
     """Invoke the Adaptive AI Tutor with SSE streaming."""
-    return StreamingResponse(_stream_persona(request, "tutor"), media_type="text/event-stream")
+    return StreamingResponse(
+        _stream_persona(request, "tutor"), media_type="text/event-stream"
+    )
 
 
 @router.post("/tutor", response_model=ChatResponse)

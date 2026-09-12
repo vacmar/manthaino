@@ -19,9 +19,11 @@ def list_tools() -> list[dict[str, Any]]:
             except (AttributeError, ValueError):
                 args_schema = getattr(tool_inst, "args", {})
 
-        manifest.append({
-            "name": tool_inst.name,
-            "description": tool_inst.description,
-            "parameters": args_schema,
-        })
+        manifest.append(
+            {
+                "name": tool_inst.name,
+                "description": tool_inst.description,
+                "parameters": args_schema,
+            }
+        )
     return manifest
