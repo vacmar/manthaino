@@ -200,14 +200,14 @@ Shipped / harden:
 
 **Exit criteria:** signup → cookie session → `/auth/me` works on http://localhost:3000.
 
-## Phase 13 — Onboarding UX hardening
+## Phase 13 — Onboarding UX hardening ✅
 
-- Fix skills/interests comma/space input bug
-- Learning style options (not free text)
-- Weekly time chips/slider
-- More roles + **Other** custom role
-- Human-readable role titles in review/dashboard
-- Persist and display full onboarding profile
+- [x] Fix skills/interests comma/space input bug (free-text; parse on submit)
+- [x] Learning style options (Visual / Hands-on / Reading / Mixed)
+- [x] Weekly time chips (5 / 10 / 15 / 20+)
+- [x] More roles + **Other** custom role
+- [x] Human-readable role titles in review
+- [x] Persist full onboarding profile (styles, interests, custom role)
 
 **Exit criteria:** onboarding completes without input bugs; review shows real labels.
 

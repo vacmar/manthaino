@@ -68,6 +68,35 @@ db: dict[str, Any] = {
                 "skill_sql": 0.7,
             },
         },
+        "role_ai": {
+            "role_id": "role_ai",
+            "required_skills": {
+                "skill_py": 0.8,
+                "skill_stats": 0.7,
+            },
+        },
+        "role_fe": {
+            "role_id": "role_fe",
+            "required_skills": {
+                "skill_py": 0.5,
+                "skill_sql": 0.4,
+            },
+        },
+        "role_mlops": {
+            "role_id": "role_mlops",
+            "required_skills": {
+                "skill_py": 0.8,
+                "skill_cloud": 0.7,
+                "skill_dist": 0.6,
+            },
+        },
+        "role_other": {
+            "role_id": "role_other",
+            "required_skills": {
+                "skill_py": 0.7,
+                "skill_sql": 0.6,
+            },
+        },
     },
     "accounts": {},
     "learners_by_id": {},
