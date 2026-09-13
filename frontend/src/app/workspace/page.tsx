@@ -45,14 +45,14 @@ if __name__ == "__main__":
 function runSelfChecks(code: string, starter: string): SelfCheck[] {
   const trimmed = code.trim();
   const lines = trimmed.split("\n").filter((l) => l.trim().length > 0);
+  const norm = (s: string) => s.replace(/\s+/g, " ").trim();
   const hasDef =
     /\bdef\s+\w+\s*\(/.test(code) ||
     /\bfunction\s+\w+\s*\(/.test(code) ||
     /\bclass\s+\w+/.test(code) ||
     /\bfn\s+\w+/.test(code);
-  const changedFromStarter =
-    trimmed !== starter.trim() &&
-    trimmed.replace(/\s+/g, " ") !== starter.trim().replace(/\s+/g, " ");
+  // Any rewrite counts — shorter drafts are fine (old check required longer than starter)
+  const changedFromStarter = norm(trimmed) !== norm(starter);
 
   return [
     {
@@ -63,12 +63,12 @@ function runSelfChecks(code: string, starter: string): SelfCheck[] {
     {
       id: "structure",
       label: "Includes a function, class, or clear structure",
-      pass: hasDef || lines.length >= 8,
+      pass: hasDef || lines.length >= 5,
     },
     {
       id: "effort",
       label: "At least a few substantive lines of work",
-      pass: lines.length >= 8,
+      pass: lines.length >= 3,
     },
   ];
 }
