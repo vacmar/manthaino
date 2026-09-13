@@ -302,6 +302,23 @@ export const api = {
     return res.json();
   },
 
+  async executeWorkspaceCode(code: string, language = "python"): Promise<{
+    ok: boolean;
+    stdout: string;
+    stderr: string;
+    exit_code: number | null;
+    timed_out: boolean;
+    language: string;
+  }> {
+    const res = await fetch(`${BACKEND_URL}/workspace/execute`, {
+      ...defaultFetchOpts,
+      method: "POST",
+      body: JSON.stringify({ code, language }),
+    });
+    if (!res.ok) throw await errorFromResponse(res, "Failed to run code");
+    return res.json();
+  },
+
   // Projects
   async getProject(projectId: string): Promise<any> {
     const res = await fetch(`${BACKEND_URL}/projects/${projectId}`, { ...defaultFetchOpts });

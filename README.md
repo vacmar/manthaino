@@ -32,6 +32,7 @@ manthaino is an adaptive learning platform built for **Exasol Devjam**. A learne
 | Onboarding | 7 answers: name, role, domain, experience, skills, interests, learning style + weekly time. |
 | AI path | Backend calls AI `POST /path/generate` → stages + capstone → first node **unlocked**, rest **locked**. |
 | Learn | Focus UI (sidebar hidden): lesson chat scoped to the current node + rich notes. |
+| Practice | **Workspace** practice pad: path-node drafts, Python **Run** → stdout/stderr, local self-checks. |
 | Mastery | AI-gated confirm → sequential unlock; Progress / My Path update. |
 | Projects | Capstone recommended from the AI path (role-aligned). |
 
@@ -71,7 +72,8 @@ mathaino/                 ← run all docker compose commands from here
 ### Known limits
 
 - Multi-track “Duolingo” role switcher: designed, not fully shipped in this window.
-- Sandboxed code Run / full auto project eval: not in this cut.
+- Workspace **Run** is a lightweight backend Python execute (timeout + output caps) — not a full hardened sandbox.
+- Full auto project eval / repo CI evidence: not in this cut.
 - Paths are Redis-cached for fast restore; Exasol holds accounts (+ lesson sessions when connected).
 
 ---
@@ -279,15 +281,16 @@ Once setup verification passes:
 5. Open the **active** (unlocked) node → focus lesson:
    - Chat with the AI tutor (scoped to this node).
    - Take **rich notes** (title, bold, lists, tables) and Save.
-6. When the tutor marks the node ready, click **Confirm mastery**.
-7. Confirm the **next node unlocks**; check **My Path**, **Progress**, and **Projects** (AI capstone).
+6. Optional — **Workspace**: draft Python for the current node, click **Run**, inspect stdout/stderr. Mastery still happens in the lesson.
+7. When the tutor marks the node ready, click **Confirm mastery**.
+8. Confirm the **next node unlocks**; check **My Path**, **Progress**, and **Projects** (AI capstone).
 
 **Tips**
 
 - Only one node is unlocked at a time until mastery is confirmed.
 - After a backend rebuild, reload Dashboard (Redis usually restores the path) or use **Restore my path** on the lesson screen.
 - Wrong password shows a plain message (not raw JSON).
-
+- Workspace drafts save in the browser (`localStorage`); Reset restores the starter template.
 ---
 
 ## Stop / restart / rebuild

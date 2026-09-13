@@ -57,6 +57,13 @@ Base URL: `http://localhost:8000` (see `frontend` env `NEXT_PUBLIC_BACKEND_URL`)
 - `POST /projects/{project_id}/submit` — `{ learner_id, artifact }`
 - `POST /projects/{project_id}/evaluate` — structured evaluation payload
 
+## Workspace (`/workspace`)
+
+- `POST /workspace/execute` — body `{ code, language?: "python" }`
+  - Runs Python on the backend with a short timeout (~4s) and clipped stdout/stderr
+  - Demo/local practice pad — not a full isolation sandbox
+  - Response: `{ ok, stdout, stderr, exit_code, timed_out, language }`
+
 ## Conversations (`/conversations`)
 
 - `GET /conversations/{conversation_id}`
