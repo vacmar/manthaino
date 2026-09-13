@@ -166,7 +166,16 @@ Phase checklist: [spec/PHASES.md](./spec/PHASES.md). Deep notes: [docs/deep-rese
 
 ---
 
-## Documentation index
+## Exasol Devjam alignment
+
+Built for **Exasol Devjam** submission constraints:
+
+- **Data platform:** Exasol Personal (local) — not docker-db on Apple Silicon; see ADR above.
+- **Any stack / LLM:** Next.js + FastAPI + Hugging Face Inference for path + lesson tutoring.
+- **Docs:** This README + `docs/` cover overview, setup, architecture, and demo flow.
+- **UX:** Onboarding → AI path → interactive lesson chat → confirm mastery → progress unlock.
+
+Judging-oriented strengths: personalized AI curricula on Exasol-backed accounts, deterministic unlocks, and interactive tutoring scoped per node.
 
 - [Architecture](./docs/architecture.md)
 - [Product flow](./docs/product-flow.md)

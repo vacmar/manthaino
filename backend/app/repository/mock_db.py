@@ -156,6 +156,7 @@ db: dict[str, Any] = {
     "assessments": {},
     "conversations": {},
     "lesson_notes": {},  # f"{learner_id}:{node_id}" -> notes text
+    "lesson_meta": {},  # f"{learner_id}:{node_id}" -> {ai_ready: bool, ...}
     "summaries": {},
     "learner_profiles": {"L1": {"target_role": "role_de"}},
     "lessons": {

@@ -181,6 +181,19 @@ def save_lesson_notes(learner_id: str, node_id: str, notes: str) -> str:
     return notes
 
 
+def get_lesson_meta(learner_id: str, node_id: str) -> dict:
+    key = f"{learner_id}:{node_id}"
+    return dict(db.setdefault("lesson_meta", {}).get(key) or {})
+
+
+def save_lesson_meta(learner_id: str, node_id: str, meta: dict) -> dict:
+    key = f"{learner_id}:{node_id}"
+    current = dict(db.setdefault("lesson_meta", {}).get(key) or {})
+    current.update(meta)
+    db.setdefault("lesson_meta", {})[key] = current
+    return current
+
+
 # --- Assessments ---
 def get_assessment(assessment_id: str) -> dict:
     """Read final assessment result from DB"""

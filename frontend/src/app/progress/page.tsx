@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { BarChart3, CheckCircle2, AlertTriangle, History } from "lucide-react";
+import { BarChart3, CheckCircle2, AlertTriangle, History, CircleDashed } from "lucide-react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { api, PathNode } from "@/lib/api";
 
@@ -21,12 +21,18 @@ interface WeakConcept {
   node_id: string;
 }
 
+type LessonNode = PathNode & { course_title?: string };
+
 export default function ProgressPage() {
   const [mastery, setMastery] = useState<MasteryRow[]>([]);
   const [weakConcepts, setWeakConcepts] = useState<WeakConcept[]>([]);
-  const [completedNodes, setCompletedNodes] = useState<PathNode[]>([]);
+  const [completedNodes, setCompletedNodes] = useState<LessonNode[]>([]);
+  const [activeNode, setActiveNode] = useState<LessonNode | null>(null);
   const [history, setHistory] = useState<{ label: string; detail: string }[]>([]);
   const [pathProgress, setPathProgress] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [totalNodes, setTotalNodes] = useState(0);
+  const [goal, setGoal] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,17 +40,25 @@ export default function ProgressPage() {
       try {
         const [me, path, verification] = await Promise.all([
           api.getMe(),
-          api.getActivePath(),
-          api.getVerification(),
+          api.ensureActivePath(),
+          api.getVerification().catch(() => null),
         ]);
 
-        const completed = path.nodes
+        const nodes = (path.nodes || []) as LessonNode[];
+        const completed = nodes
           .filter((n) => n.status === "COMPLETED")
           .sort((a, b) => a.sequence_order - b.sequence_order);
         setCompletedNodes(completed);
+        setCompletedCount(completed.length);
+        setTotalNodes(nodes.length);
         setPathProgress(
-          path.nodes.length > 0 ? Math.round((completed.length / path.nodes.length) * 100) : 0
+          nodes.length > 0 ? Math.round((completed.length / nodes.length) * 100) : 0
         );
+        setGoal(path.goal || "");
+
+        const active =
+          nodes.find((n) => n.status === "IN_PROGRESS" || n.status === "UNLOCKED") || null;
+        setActiveNode(active);
 
         const verifiedBySkill = new Map<string, number>();
         verification?.discrepancies?.forEach((d) => {
@@ -59,16 +73,17 @@ export default function ProgressPage() {
 
         const rows: MasteryRow[] = Array.from(skillIds).map((skill_id) => ({
           skill_id,
-          claimed: me.self_reported_proficiency?.[skill_id] ?? (me.known_skills?.includes(skill_id) ? 0.5 : 0),
+          claimed:
+            me.self_reported_proficiency?.[skill_id] ??
+            (me.known_skills?.includes(skill_id) ? 0.5 : 0),
           verified: verifiedBySkill.get(skill_id) ?? 0,
         }));
         setMastery(rows.sort((a, b) => b.claimed - a.claimed));
 
-        const activeNodes = path.nodes.filter(
-          (n) => n.status === "IN_PROGRESS" || n.status === "UNLOCKED"
-        );
         const weak: WeakConcept[] = [];
-        for (const node of activeNodes.slice(0, 3)) {
+        for (const node of nodes
+          .filter((n) => n.status === "IN_PROGRESS" || n.status === "UNLOCKED")
+          .slice(0, 3)) {
           try {
             const res = await api.getWeakConcepts(node.node_id, me.learner_id);
             for (const w of res.weak_concepts ?? []) {
@@ -80,17 +95,23 @@ export default function ProgressPage() {
               });
             }
           } catch {
-            /* no mistakes recorded */
+            /* no mistakes */
           }
         }
         setWeakConcepts(weak);
 
         const hist = completed.map((n) => ({
-          label: n.course_id.replace(/^c_/, "").replace(/_/g, " "),
-          detail: `Completed · sequence ${n.sequence_order}`,
+          label: n.course_title || n.course_id.replace(/^c_/, "").replace(/_/g, " "),
+          detail: `Completed · step ${n.sequence_order}`,
         }));
         if (path.goal) {
           hist.unshift({ label: "Active goal", detail: path.goal });
+        }
+        if (active) {
+          hist.push({
+            label: active.course_title || active.course_id,
+            detail: `In progress · step ${active.sequence_order}`,
+          });
         }
         setHistory(hist);
       } catch (err) {
@@ -119,7 +140,10 @@ export default function ProgressPage() {
           <span className="font-bold tracking-widest uppercase text-sm">Progress</span>
         </div>
         <h1 className="text-4xl font-heading font-bold mb-2">Learning trajectory</h1>
-        <p className="text-muted-foreground text-lg">Mastery, weak concepts, completed nodes, and history.</p>
+        <p className="text-muted-foreground text-lg">
+          {goal ? `${goal} · ` : ""}
+          {completedCount} of {totalNodes} nodes completed
+        </p>
         <div className="mt-6 max-w-md">
           <div className="flex justify-between text-sm mb-2">
             <span className="text-muted-foreground">Path completion</span>
@@ -129,14 +153,42 @@ export default function ProgressPage() {
         </div>
       </motion.header>
 
+      {activeNode && (
+        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <CircleDashed className="w-5 h-5 text-primary mt-0.5" />
+            <div>
+              <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-1">
+                Current node
+              </p>
+              <p className="font-medium text-white">
+                {activeNode.course_title || activeNode.course_id}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Finish the AI lesson and confirm mastery to update this page.
+              </p>
+            </div>
+          </div>
+          <Link
+            href={`/lesson/${activeNode.node_id}`}
+            className="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-primary text-white text-sm font-medium"
+          >
+            Resume lesson
+          </Link>
+        </div>
+      )}
+
       <section className="grid md:grid-cols-2 gap-6">
-        <Card className="p-6 border border-border bg-card">
+        <div className="p-6 rounded-2xl border border-border bg-card/40">
           <h2 className="font-heading font-bold text-lg mb-4 flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" />
-            Mastery
+            Mastery signals
           </h2>
           {mastery.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No skill signals yet.</p>
+            <p className="text-sm text-muted-foreground">
+              Skills from onboarding will appear here. Completing nodes strengthens verified
+              signals.
+            </p>
           ) : (
             <ul className="space-y-4">
               {mastery.map((m) => (
@@ -147,24 +199,32 @@ export default function ProgressPage() {
                       claim {Math.round(m.claimed * 100)}% · verified {Math.round(m.verified * 100)}%
                     </span>
                   </div>
-                  <Progress value={Math.min(100, Math.max(m.claimed, m.verified) * 100)} className="h-1.5" />
+                  <Progress
+                    value={Math.min(100, Math.max(m.claimed, m.verified) * 100)}
+                    className="h-1.5"
+                  />
                 </li>
               ))}
             </ul>
           )}
-        </Card>
+        </div>
 
-        <Card className="p-6 border border-border bg-card">
+        <div className="p-6 rounded-2xl border border-border bg-card/40">
           <h2 className="font-heading font-bold text-lg mb-4 flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-primary" />
             Weak concepts
           </h2>
           {weakConcepts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No recorded mistakes yet.</p>
+            <p className="text-sm text-muted-foreground">
+              No recorded mistakes yet — keep learning in the AI lesson.
+            </p>
           ) : (
             <ul className="space-y-3">
               {weakConcepts.map((w) => (
-                <li key={`${w.node_id}-${w.concept}`} className="p-3 rounded-lg bg-muted/40 border border-border">
+                <li
+                  key={`${w.node_id}-${w.concept}`}
+                  className="p-3 rounded-lg bg-muted/40 border border-border"
+                >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium">{w.concept}</span>
                     <Badge variant="secondary">{w.error_count} errors</Badge>
@@ -174,32 +234,42 @@ export default function ProgressPage() {
               ))}
             </ul>
           )}
-        </Card>
+        </div>
       </section>
 
-      <Card className="p-6 border border-border bg-card">
+      <div className="p-6 rounded-2xl border border-border bg-card/40">
         <h2 className="font-heading font-bold text-lg mb-4 flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-secondary" />
           Completed nodes
         </h2>
         {completedNodes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No completed nodes yet.</p>
+          <p className="text-sm text-muted-foreground">
+            When the AI marks a node ready and you confirm mastery, it shows up here and unlocks
+            the next step.
+          </p>
         ) : (
           <ul className="grid sm:grid-cols-2 gap-3">
             {completedNodes.map((n) => (
-              <li key={n.node_id} className="flex items-center gap-3 p-3 rounded-lg border border-border">
-                <CheckCircle2 className="w-5 h-5 text-secondary shrink-0" />
-                <div>
-                  <p className="font-medium">{n.course_id.replace(/^c_/, "").replace(/_/g, " ")}</p>
-                  <p className="text-xs font-mono text-muted-foreground">#{n.sequence_order}</p>
-                </div>
+              <li key={n.node_id}>
+                <Link
+                  href={`/lesson/${n.node_id}`}
+                  className="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/40 transition-colors"
+                >
+                  <CheckCircle2 className="w-5 h-5 text-secondary shrink-0" />
+                  <div>
+                    <p className="font-medium">
+                      {n.course_title || n.course_id.replace(/^c_/, "").replace(/_/g, " ")}
+                    </p>
+                    <p className="text-xs font-mono text-muted-foreground">#{n.sequence_order}</p>
+                  </div>
+                </Link>
               </li>
             ))}
           </ul>
         )}
-      </Card>
+      </div>
 
-      <Card className="p-6 border border-border bg-card">
+      <div className="p-6 rounded-2xl border border-border bg-card/40">
         <h2 className="font-heading font-bold text-lg mb-4 flex items-center gap-2">
           <History className="w-5 h-5 text-primary" />
           History
@@ -217,7 +287,7 @@ export default function ProgressPage() {
             ))}
           </ol>
         )}
-      </Card>
+      </div>
     </div>
   );
 }

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -26,8 +28,53 @@ def _lesson_state_block(req: ChatRequest) -> str:
         f"CURRENT NODE (teach only this): {current}",
         f"Completed nodes: {', '.join(completed) if completed else 'none yet'}",
         f"Upcoming nodes (defer these topics): {', '.join(upcoming) if upcoming else 'none listed'}",
+        f"Chat turns so far (approx): {len(req.history or [])}",
     ]
     return "\n".join(lines)
+
+
+def _extract_json(text: str) -> dict[str, Any] | None:
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        pass
+    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except (json.JSONDecodeError, TypeError):
+            return None
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except (json.JSONDecodeError, TypeError):
+            return None
+    return None
+
+
+def _heuristic_ready(req: ChatRequest) -> bool:
+    """Fallback when the model forgets the ready flag."""
+    history = req.history or []
+    if len(history) < 3:
+        return False
+    last_user = (req.message or "").strip().lower()
+    affirm = (
+        "no doubt",
+        "no doubts",
+        "i understand",
+        "understood",
+        "got it",
+        "makes sense",
+        "clear now",
+        "yes i get",
+        "i'm good",
+        "im good",
+        "ready to move",
+        "can we finish",
+        "complete",
+    )
+    return any(a in last_user for a in affirm)
 
 
 async def run_lesson_chat(req: ChatRequest) -> ChatResponse:
@@ -52,11 +99,28 @@ async def run_lesson_chat(req: ChatRequest) -> ChatResponse:
 
     try:
         llm = get_llm(temperature=0.4)
-        # Plain chat — no tool binding, so replies stay conversational
         response = await llm.ainvoke(messages)
-        text = str(response.content or "").strip() or (
-            "I'm here — tell me what part you'd like to go over again."
-        )
+        raw = str(response.content or "").strip()
+        parsed = _extract_json(raw) if raw else None
+
+        if parsed and parsed.get("message"):
+            text = str(parsed.get("message") or "").strip()
+            ready = bool(parsed.get("node_ready_to_complete"))
+            reason = str(parsed.get("ready_reason") or "")
+        else:
+            text = raw or "I'm here — tell me what part you'd like to go over again."
+            ready = False
+            reason = "plain_text_reply"
+
+        if not ready:
+            ready = _heuristic_ready(req)
+            if ready and not reason:
+                reason = "learner_affirmed_understanding"
+
+        # Never mark ready on a cold start / first opener
+        if len(req.history or []) < 2:
+            ready = False
+
         return ChatResponse(
             message=text,
             persona="tutor",
@@ -66,6 +130,8 @@ async def run_lesson_chat(req: ChatRequest) -> ChatResponse:
                     "current_node_title", "Current lesson"
                 ),
                 "mode": "lesson_chat",
+                "node_ready_to_complete": ready,
+                "ready_reason": reason,
             },
             tool_calls=[],
         )
@@ -78,6 +144,10 @@ async def run_lesson_chat(req: ChatRequest) -> ChatResponse:
                 f"While we reconnect, what specifically about {current} are you stuck on?"
             ),
             persona="tutor",
-            structured={"content": "", "mode": "lesson_chat_fallback"},
+            structured={
+                "content": "",
+                "mode": "lesson_chat_fallback",
+                "node_ready_to_complete": False,
+            },
             tool_calls=[],
         )

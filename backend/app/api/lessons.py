@@ -28,16 +28,24 @@ class MessagesReplacePayload(BaseModel):
     replace: bool = True
 
 
+class ReadyPayload(BaseModel):
+    ai_ready: bool = False
+    ready_reason: str | None = None
+
+
 @router.get("/me/{node_id}/session")
 def get_lesson_session(node_id: str, learner: Learner = Depends(get_current_learner)):
     conv_id = state_repo.lesson_conversation_id(learner.learner_id, node_id)
     messages = state_repo.get_conversation(conv_id)
     notes = state_repo.get_lesson_notes(learner.learner_id, node_id)
+    meta = state_repo.get_lesson_meta(learner.learner_id, node_id)
     return {
         "node_id": node_id,
         "conversation_id": conv_id,
         "messages": messages,
         "practice_notes": notes,
+        "ai_ready": bool(meta.get("ai_ready")),
+        "ready_reason": meta.get("ready_reason"),
     }
 
 
@@ -51,6 +59,24 @@ def save_lesson_notes(
         learner.learner_id, node_id, payload.practice_notes or ""
     )
     return {"node_id": node_id, "practice_notes": saved, "saved": True}
+
+
+@router.put("/me/{node_id}/ready")
+def save_lesson_ready(
+    node_id: str,
+    payload: ReadyPayload,
+    learner: Learner = Depends(get_current_learner),
+):
+    meta = state_repo.save_lesson_meta(
+        learner.learner_id,
+        node_id,
+        {
+            "ai_ready": payload.ai_ready,
+            "ready_reason": payload.ready_reason,
+            "updated_at": datetime.now(UTC).isoformat(),
+        },
+    )
+    return {"node_id": node_id, **meta}
 
 
 @router.post("/me/{node_id}/messages")

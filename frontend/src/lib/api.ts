@@ -112,12 +112,24 @@ export const api = {
     conversation_id: string;
     messages: Array<{ role: string; content: string }>;
     practice_notes: string;
+    ai_ready?: boolean;
+    ready_reason?: string;
   }> {
     const res = await fetch(`${BACKEND_URL}/lessons/me/${nodeId}/session`, {
       ...defaultFetchOpts,
       cache: "no-store",
     });
     if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+    return res.json();
+  },
+
+  async saveLessonReady(nodeId: string, aiReady: boolean, readyReason?: string): Promise<any> {
+    const res = await fetch(`${BACKEND_URL}/lessons/me/${nodeId}/ready`, {
+      ...defaultFetchOpts,
+      method: "PUT",
+      body: JSON.stringify({ ai_ready: aiReady, ready_reason: readyReason }),
+    });
+    if (!res.ok) throw new Error(`Failed to save ready state: ${res.status}`);
     return res.json();
   },
 

@@ -12,6 +12,8 @@ import {
   User,
   Loader2,
   Save,
+  NotebookPen,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -50,6 +52,8 @@ export default function LessonPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [tutorBootstrapped, setTutorBootstrapped] = useState(false);
+  const [aiReady, setAiReady] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -70,6 +74,16 @@ export default function LessonPage() {
     persistTimer.current = setTimeout(() => {
       void persistMessages(next);
     }, 300);
+  }
+
+  async function markAiReady(ready: boolean, reason?: string) {
+    if (!ready) return;
+    setAiReady(true);
+    try {
+      await api.saveLessonReady(nodeId, true, reason);
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   async function loadPath(preferEnsure = false) {
@@ -101,9 +115,8 @@ export default function LessonPage() {
             .filter((m) => m.content?.trim() && !PLACEHOLDER_MSGS.has(m.content.trim()));
           setMessages(restored);
           setPracticeNotes(session.practice_notes || "");
-          if (restored.length > 0) {
-            setTutorBootstrapped(true);
-          }
+          setAiReady(Boolean(session.ai_ready) || found.status === "COMPLETED");
+          if (restored.length > 0) setTutorBootstrapped(true);
         } catch (err) {
           console.error(err);
           setMessages([]);
@@ -168,7 +181,8 @@ export default function LessonPage() {
     const opener =
       `Start the interactive lesson for “${lessonContext.current_node_title}”. ` +
       `Give a short friendly opener (3–5 sentences) covering one core idea only, ` +
-      `then ask if I understood or have any doubts. Do not teach upcoming topics.`;
+      `then ask if I understood or have any doubts. Do not teach upcoming topics. ` +
+      `Keep node_ready_to_complete false on this first turn.`;
 
     setTutorBootstrapped(true);
     setMessages([{ role: "assistant", content: "Starting your AI lesson…" }]);
@@ -208,6 +222,9 @@ export default function LessonPage() {
         (typeof data.message === "string" && data.message) ||
         data.structured?.content ||
         "What would you like to go over in this lesson?";
+      const ready = Boolean(data.structured?.node_ready_to_complete);
+      const reason = data.structured?.ready_reason as string | undefined;
+      if (ready) void markAiReady(true, reason);
 
       setMessages((prev) => {
         let next: ChatMsg[];
@@ -275,16 +292,18 @@ export default function LessonPage() {
     setRestoring(false);
   };
 
-  const handleComplete = async () => {
+  const handleConfirmComplete = async () => {
     if (!node || node.status === "LOCKED" || node.status === "COMPLETED") return;
-    if (practiceNotes.trim().length < 8) {
-      setError("Add a short practice note before completing this node.");
+    if (!aiReady) {
+      setError("Keep learning with the AI until it marks this node ready.");
       return;
     }
     setCompleting(true);
     setError("");
     try {
-      await api.saveLessonNotes(nodeId, practiceNotes);
+      if (practiceNotes.trim()) {
+        await api.saveLessonNotes(nodeId, practiceNotes);
+      }
       await persistMessages(messages);
       const me = await api.getMe();
       await api.completeLesson(me.learner_id, nodeId);
@@ -310,8 +329,7 @@ export default function LessonPage() {
         <div className="bg-card/40 border border-border/50 rounded-2xl p-8 space-y-4">
           <h1 className="text-2xl font-bold text-white">Lesson unavailable</h1>
           <p className="text-zinc-400 text-sm leading-relaxed">
-            Your learning path was cleared when the backend restarted. You do not need a new
-            account — restore the path and reopen the node.
+            Your path was cleared after a backend restart. Restore it — no new account needed.
           </p>
           <button
             onClick={handleRestorePath}
@@ -326,119 +344,43 @@ export default function LessonPage() {
   }
 
   const locked = node.status === "LOCKED";
+  const completed = node.status === "COMPLETED";
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <Link
-        href="/dashboard"
-        className="inline-flex items-center gap-2 text-zinc-400 hover:text-white mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-      </Link>
-
-      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_0.9fr] gap-6">
-        <div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-2xl flex flex-col min-h-[70vh]">
-          <div className="p-5 border-b border-border/50 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-              <Bot className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <span className="text-primary text-xs font-bold tracking-widest uppercase">
-                AI Lesson Chat
-              </span>
-              <h1 className="text-xl font-bold text-white">{title}</h1>
-              <p className="text-xs text-zinc-500">
-                Chat is saved for this node — leave and come back anytime.
-              </p>
-            </div>
-          </div>
-
-          {locked ? (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground gap-2 p-8">
-              <Lock className="w-4 h-4" /> Unlock this node to start the AI lesson.
-            </div>
-          ) : (
-            <>
-              <div className="flex-1 overflow-y-auto space-y-4 p-5">
-                {messages.map((msg, idx) => (
-                  <div
-                    key={`${msg.role}-${idx}`}
-                    className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-                  >
-                    <div
-                      className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center ${
-                        msg.role === "user" ? "bg-primary" : "bg-primary/20"
-                      }`}
-                    >
-                      {msg.role === "user" ? (
-                        <User className="w-4 h-4 text-white" />
-                      ) : (
-                        <Bot className="w-4 h-4 text-primary" />
-                      )}
-                    </div>
-                    <div
-                      className={`px-4 py-3 rounded-2xl text-sm leading-relaxed max-w-[85%] whitespace-pre-wrap ${
-                        msg.role === "user"
-                          ? "bg-primary text-white rounded-tr-none"
-                          : "bg-black/30 border border-white/10 text-zinc-300 rounded-tl-none"
-                      }`}
-                    >
-                      {msg.content}
-                    </div>
-                  </div>
-                ))}
-                {chatLoading && messages[messages.length - 1]?.role === "user" && (
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                      <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                    </div>
-                    <div className="text-sm text-zinc-500 self-center">Thinking…</div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-
-              <form
-                onSubmit={handleChatSubmit}
-                className="p-4 border-t border-border/50 relative"
-              >
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask a doubt, say you understood, or request an example…"
-                  disabled={chatLoading}
-                  className="w-full bg-black/40 border border-white/10 rounded-full pl-5 pr-14 py-3.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary/50"
-                />
-                <button
-                  type="submit"
-                  disabled={!input.trim() || chatLoading}
-                  className="absolute right-6 top-1/2 -translate-y-1/2 p-2.5 bg-primary hover:bg-primary/90 text-white rounded-full disabled:opacity-50"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </form>
-            </>
-          )}
+    <div className="h-[calc(100vh-2rem)] max-w-5xl mx-auto p-4 md:p-6 flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-3 shrink-0">
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors text-sm"
+        >
+          <ArrowLeft className="w-4 h-4" /> Pathway
+        </Link>
+        <div className="text-right">
+          <p className="text-[11px] uppercase tracking-widest text-primary font-semibold">
+            {completed ? "Completed node" : "Active node"}
+          </p>
+          <h1 className="text-lg md:text-xl font-bold text-white leading-tight">{title}</h1>
         </div>
+      </div>
 
-        <div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-2xl p-6 space-y-5 h-fit">
-          <div>
-            <h2 className="text-lg font-semibold text-white mb-2">Practice notes</h2>
-            <p className="text-zinc-400 text-sm leading-relaxed">
-              Capture what you learned. Use <strong className="text-zinc-200">Save</strong> so
-              notes survive when you leave this page.
-            </p>
-          </div>
-
-          {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 text-red-400 text-sm">{error}</div>
-          )}
-
-          <div className="bg-black/30 rounded-xl p-4 border border-white/5 space-y-3">
+      {/* Notes strip on top — stays visible when chat grows */}
+      <div className="shrink-0 rounded-2xl border border-border/60 bg-card/50 backdrop-blur-sm overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setNotesOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/5"
+        >
+          <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
+            <NotebookPen className="w-4 h-4 text-primary" />
+            Practice notes
+          </span>
+          <span className="text-xs text-zinc-500">{notesOpen ? "Hide" : "Show"}</span>
+        </button>
+        {notesOpen && (
+          <div className="px-4 pb-4 space-y-3 border-t border-border/40 pt-3">
             <textarea
-              className="w-full min-h-[160px] text-sm leading-relaxed bg-black/50 p-3 rounded-lg text-zinc-200 border border-white/10 whitespace-pre-wrap"
-              placeholder={"What did you learn?\n\n• Key idea\n• Example you tried\n• Still unclear…"}
+              className="w-full min-h-[88px] text-sm leading-relaxed bg-black/40 p-3 rounded-xl text-zinc-200 border border-white/10 whitespace-pre-wrap"
+              placeholder={"Key takeaways…\n• Idea\n• Example\n• Still unclear"}
               value={practiceNotes}
               disabled={locked}
               onChange={(e) => {
@@ -448,47 +390,141 @@ export default function LessonPage() {
             />
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs text-zinc-500">
-                {notesSavedAt ? `Saved at ${notesSavedAt}` : "Unsaved changes stay local until Save"}
+                {notesSavedAt ? `Saved at ${notesSavedAt}` : "Notes save with this node"}
               </p>
               <button
                 type="button"
                 onClick={handleSaveNotes}
                 disabled={savingNotes || locked}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-muted/40 text-sm text-white hover:bg-muted disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs text-white hover:bg-muted/40 disabled:opacity-50"
               >
-                {savingNotes ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                Save notes
+                {savingNotes ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Save
               </button>
             </div>
           </div>
+        )}
+      </div>
 
-          <div className="pt-2 flex justify-between items-center gap-3">
-            <p className="text-xs text-zinc-500">Status: {node.status}</p>
-            <button
-              onClick={handleComplete}
-              disabled={completing || locked || node.status === "COMPLETED"}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-medium disabled:opacity-50"
-            >
-              {completing ? (
-                "Completing..."
-              ) : node.status === "COMPLETED" ? (
-                "Already Completed"
-              ) : locked ? (
-                <>
-                  <Lock className="w-4 h-4" /> Locked
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4" /> Complete node
-                </>
-              )}
-            </button>
+      {error && (
+        <div className="shrink-0 p-3 rounded-xl bg-red-500/10 text-red-400 text-sm">{error}</div>
+      )}
+
+      {/* Chat takes remaining height */}
+      <div className="flex-1 min-h-0 bg-card/40 border border-border/50 rounded-2xl flex flex-col overflow-hidden">
+        <div className="px-4 py-3 border-b border-border/50 flex items-center gap-3 shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
+            <Bot className="w-4 h-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs text-primary font-bold tracking-widest uppercase">AI Lesson</p>
+            <p className="text-xs text-zinc-500 truncate">
+              Chat is saved · upcoming topics stay for later nodes
+            </p>
           </div>
         </div>
+
+        {locked ? (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground gap-2 p-8">
+            <Lock className="w-4 h-4" /> Unlock this node to start the AI lesson.
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 overflow-y-auto space-y-4 p-4 md:p-5">
+              {messages.map((msg, idx) => (
+                <div
+                  key={`${msg.role}-${idx}`}
+                  className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+                >
+                  <div
+                    className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center ${
+                      msg.role === "user" ? "bg-primary" : "bg-primary/20"
+                    }`}
+                  >
+                    {msg.role === "user" ? (
+                      <User className="w-4 h-4 text-white" />
+                    ) : (
+                      <Bot className="w-4 h-4 text-primary" />
+                    )}
+                  </div>
+                  <div
+                    className={`px-4 py-3 rounded-2xl text-sm leading-relaxed max-w-[85%] whitespace-pre-wrap ${
+                      msg.role === "user"
+                        ? "bg-primary text-white rounded-tr-none"
+                        : "bg-black/30 border border-white/10 text-zinc-300 rounded-tl-none"
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {chatLoading && messages[messages.length - 1]?.role === "user" && (
+                <div className="flex gap-3 items-center text-sm text-zinc-500">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  Thinking…
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {aiReady && !completed && (
+              <div className="mx-4 mb-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+                <div className="flex items-start gap-2 text-sm text-zinc-200">
+                  <Sparkles className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                  <span>
+                    The AI thinks you’ve covered this node. Confirm to unlock the next step and
+                    update Progress.
+                  </span>
+                </div>
+                <button
+                  onClick={handleConfirmComplete}
+                  disabled={completing}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium disabled:opacity-50 shrink-0"
+                >
+                  {completing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4" />
+                  )}
+                  Confirm mastery
+                </button>
+              </div>
+            )}
+
+            {!aiReady && !completed && (
+              <p className="px-4 pb-1 text-[11px] text-zinc-500">
+                Keep chatting until the tutor marks this node ready — there’s no free Complete button.
+              </p>
+            )}
+
+            {completed && (
+              <p className="px-4 pb-2 text-xs text-emerald-400/90 inline-flex items-center gap-1.5">
+                <CheckCircle className="w-3.5 h-3.5" /> Node completed — you can still review the chat.
+              </p>
+            )}
+
+            <form
+              onSubmit={handleChatSubmit}
+              className="p-3 md:p-4 border-t border-border/50 relative shrink-0"
+            >
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask a doubt, say you understood, or request an example…"
+                disabled={chatLoading}
+                className="w-full bg-black/40 border border-white/10 rounded-full pl-5 pr-14 py-3.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary/50"
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() || chatLoading}
+                className="absolute right-5 md:right-6 top-1/2 -translate-y-1/2 p-2.5 bg-primary hover:bg-primary/90 text-white rounded-full disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
