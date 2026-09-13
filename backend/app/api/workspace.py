@@ -57,6 +57,7 @@ def execute_code(body: ExecuteRequest) -> ExecuteResponse:
                 text=True,
                 timeout=TIMEOUT_SEC,
                 cwd=tmp,
+                check=False,
                 env={
                     "PATH": "/usr/local/bin:/usr/bin:/bin",
                     "PYTHONUNBUFFERED": "1",
