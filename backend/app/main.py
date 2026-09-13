@@ -15,6 +15,7 @@ from app.api import (
     paths,
     projects,
     verification,
+    workspace,
 )
 from app.repository import exasol_db
 
@@ -56,6 +57,7 @@ app.include_router(conversations.router)
 app.include_router(projects.router)
 app.include_router(onboarding.router)
 app.include_router(verification.router)
+app.include_router(workspace.router)
 
 
 @app.get("/health", tags=["Health"])

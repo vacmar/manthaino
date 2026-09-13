@@ -27,8 +27,8 @@ Phases **0–11** remain the original Antigravity build contract and can still b
 - Lesson content is thin; mastery is not gated on concept completion.
 
 ### Workspace
-- Interactive workspace is mostly an empty editor + tutor panel.
-- No run/check, no node binding, no concept checklist, no pass criteria.
+- **Shipped (lightweight):** practice pad bound to active path nodes; drafts in localStorage; Python `POST /workspace/execute` with Run + output panel; local self-checks.
+- Still not a hardened container sandbox; mastery remains lesson/backend-owned.
 
 ### Projects
 - Capstone UI accepts a GitHub URL and shows requirement checkboxes.
@@ -89,8 +89,9 @@ What we implemented to make the stack runnable on Mac + Docker Desktop:
 **Exit criteria:** Python (or first node) cannot be marked complete without interactive learning evidence.
 
 ## Phase 16 — Workspace execution & project validation
-- Sandboxed `POST /workspace/execute` (container limits, timeouts)
-- Wire workspace Run button; show stdout/stderr
+- Lightweight `POST /workspace/execute` + Workspace Run UI (**shipped for demo**)
+- Hardened container limits / network isolation (still open)
+- Wire fuller project evaluation evidence beyond stub submit
 - Projects: real submit pipeline, requirement checks, structured evaluate
 - Mentor chat grounded on project requirements + submission result
 - Evidence written to learner profile on pass

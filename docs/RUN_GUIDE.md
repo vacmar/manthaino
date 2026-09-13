@@ -147,6 +147,7 @@ Exasol Personal data persists on the host until you reset it via Exakit tools.
 | Login feels slow | Expected — bcrypt + Exasol round-trip; wrong password takes similar time by design |
 | Dashboard skeleton forever | Check AI health / HF key; first path gen calls the LLM once |
 | Lesson shows raw JSON | Hard-refresh; current build unwraps `message` field |
+| Workspace Run fails | Rebuild backend (`docker compose up -d --build backend`); only Python is supported |
 | Cookies / “Not authenticated” | Stay on `http://localhost:3000`; don’t mix hosts |
 | Apple Silicon + docker-db | Don’t; use Personal only |
 
@@ -159,6 +160,10 @@ docker compose up -d --build
 curl --fail http://localhost:8000/health
 curl --fail http://localhost:8001/health
 curl --fail http://localhost:3000
+# optional practice-pad execute
+curl -s -X POST http://localhost:8000/workspace/execute \
+  -H 'Content-Type: application/json' \
+  -d '{"code":"print(42)","language":"python"}'
 ```
 
 GitHub Actions `Deploy and Smoke Test` runs this on pushes to `main`.

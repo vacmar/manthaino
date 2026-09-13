@@ -6,7 +6,7 @@ manthaino is a monorepo with three runtime services and an Exasol-backed data la
 
 | Layer | Location | Role |
 |-------|----------|------|
-| Frontend | `frontend/` | Next.js App Router UI: onboarding, path, workspace, progress, projects |
+| Frontend | `frontend/` | Next.js App Router UI: onboarding, path, lesson, workspace practice pad, progress, projects |
 | Backend | `backend/` | FastAPI state machine: paths, nodes, assessments, verification, projects |
 | AI service | `ai-service/` | LangGraph orchestrator, tutor/pathway/mentor personas, tool calls to backend |
 | Data | `backend/infra/exasol/` | Schema, seeds, analytical queries (Exasol Personal locally) |
