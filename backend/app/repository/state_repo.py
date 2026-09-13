@@ -1,7 +1,100 @@
-from app.models.domain import PathNode
+import logging
 
+from app.models.domain import PathNode, LearningPath, Account, Learner
+from . import exasol_db
 from .mock_db import db
 
+logger = logging.getLogger(__name__)
+
+
+def _use_exasol_auth() -> bool:
+    return exasol_db.exasol_configured()
+
+
+def _save_account_mock(account: Account):
+    db.setdefault("accounts", {})[account.account_id] = account
+
+
+def _save_learner_mock(learner: Learner):
+    db.setdefault("learners_by_id", {})[learner.learner_id] = learner
+    db.setdefault("learners_by_account", {})[learner.account_id] = learner
+
+
+# --- Accounts & Learners (Exasol or in-memory fallback) ---
+
+
+def create_account(account: Account):
+    if _use_exasol_auth():
+        try:
+            exasol_db.create_account(account)
+            return
+        except Exception as e:
+            logger.warning("Exasol create_account failed, using mock store: %s", e)
+    _save_account_mock(account)
+
+
+def get_account_by_email(email: str) -> Account | None:
+    if _use_exasol_auth():
+        try:
+            return exasol_db.get_account_by_email(email)
+        except Exception as e:
+            logger.warning("Exasol get_account_by_email failed, using mock store: %s", e)
+    for acc in db.get("accounts", {}).values():
+        if acc.email == email:
+            return acc
+    return None
+
+
+def get_account_by_id(account_id: str) -> Account | None:
+    if _use_exasol_auth():
+        try:
+            return exasol_db.get_account_by_id(account_id)
+        except Exception as e:
+            logger.warning("Exasol get_account_by_id failed, using mock store: %s", e)
+    return db.get("accounts", {}).get(account_id)
+
+
+def create_learner(learner: Learner):
+    if _use_exasol_auth():
+        try:
+            exasol_db.create_learner(learner)
+            _save_learner_mock(learner)  # keep local cache in sync
+            return
+        except Exception as e:
+            logger.warning("Exasol create_learner failed, using mock store: %s", e)
+    _save_learner_mock(learner)
+
+
+def get_learner(learner_id: str) -> Learner | None:
+    if _use_exasol_auth():
+        try:
+            found = exasol_db.get_learner(learner_id)
+            if found:
+                return found
+        except Exception as e:
+            logger.warning("Exasol get_learner failed, using mock store: %s", e)
+    return db.get("learners_by_id", {}).get(learner_id)
+
+
+def get_learner_by_account(account_id: str) -> Learner | None:
+    if _use_exasol_auth():
+        try:
+            found = exasol_db.get_learner_by_account(account_id)
+            if found:
+                return found
+        except Exception as e:
+            logger.warning("Exasol get_learner_by_account failed, using mock store: %s", e)
+    return db.get("learners_by_account", {}).get(account_id)
+
+
+def update_learner(learner: Learner):
+    if _use_exasol_auth():
+        try:
+            exasol_db.update_learner(learner)
+            return
+        except Exception as e:
+            logger.warning("Exasol update_learner failed, using mock store: %s", e)
+    _save_learner_mock(learner)
 
 def get_node(node_id: str) -> PathNode | None:
     if node_id in db["nodes"]:
@@ -29,6 +122,10 @@ def get_active_path(learner_id: str) -> LearningPath | None:
 
 def save_path(path: LearningPath):
     db["paths"][path.path_id] = path
+
+
+def get_path(path_id: str) -> LearningPath | None:
+    return db["paths"].get(path_id)
 
 
 def get_prerequisites(course_id: str):
@@ -201,3 +298,43 @@ def get_project_submissions_for_learner(learner_id: str, project_id: str) -> lis
 
 def save_project_submission(submission: dict):
     db["project_submissions"][submission["submission_id"]] = submission
+
+
+# --- Goals ---
+def save_goal(goal: dict):
+    db.setdefault("goals", {})[goal["goal_id"]] = goal
+
+
+def get_goal(goal_id: str) -> dict | None:
+    return db.get("goals", {}).get(goal_id)
+
+
+def get_goals_for_learner(learner_id: str) -> list:
+    return [g for g in db.get("goals", {}).values() if g.get("learner_id") == learner_id]
+
+
+# --- Learning progress ---
+def get_learning_progress(learner_id: str, node_id: str) -> dict | None:
+    key = f"{learner_id}:{node_id}"
+    return db.get("learning_progress", {}).get(key)
+
+
+def save_learning_progress(learner_id: str, node_id: str, progress: dict):
+    key = f"{learner_id}:{node_id}"
+    db.setdefault("learning_progress", {})[key] = progress
+
+
+# --- Verification sessions ---
+def save_verification_session(session_id: str, session: dict):
+    db.setdefault("verification_sessions", {})[session_id] = session
+
+
+def get_verification_session(session_id: str) -> dict | None:
+    return db.get("verification_sessions", {}).get(session_id)
+
+
+def get_verification_session_for_skill(learner_id: str, skill_id: str) -> dict | None:
+    for session in db.get("verification_sessions", {}).values():
+        if session.get("learner_id") == learner_id and session.get("skill_id") == skill_id:
+            return session
+    return None

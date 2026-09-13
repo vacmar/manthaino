@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Database, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { api, VerificationResult } from "@/lib/api";
+import { VerificationDiscrepancyPanel } from "@/components/VerificationDiscrepancyPanel";
 
 export interface Skill {
   name: string;
@@ -13,11 +15,37 @@ export interface Skill {
 
 export default function ProfilePage() {
   const [skills, setSkills] = useState<Skill[] | null>(null);
+  const [verification, setVerification] = useState<VerificationResult | null>(null);
 
   useEffect(() => {
-    fetch("/api/mock/profile")
-      .then(res => res.json())
-      .then(setSkills);
+    async function loadData() {
+      try {
+        const [res, ver] = await Promise.all([api.getProfile(), api.getVerification()]);
+        setVerification(ver);
+        if (Array.isArray(res.skills)) {
+          setSkills(res.skills);
+        } else {
+          const known = (res.known_skills ?? []) as string[];
+          const selfReported = (res.self_reported_proficiency ?? {}) as Record<string, number>;
+          setSkills(
+            known.map((name) => ({
+              name: name.replace(/^skill_/, ""),
+              weight: Math.round((selfReported[name] ?? 0.5) * 100),
+              verified: ver ? !ver.discrepancies.some((d) => d.skill_id === name) : false,
+            }))
+          );
+        }
+      } catch (err) {
+        console.error("Failed to load profile", err);
+        // Fallback for UI visualization if backend endpoint doesn't exist yet
+        setSkills([
+          { name: "Python", weight: 80, verified: true },
+          { name: "SQL", weight: 60, verified: false },
+          { name: "System Design", weight: 40, verified: false },
+        ]);
+      }
+    }
+    loadData();
   }, []);
 
   if (!skills) {
@@ -43,6 +71,8 @@ export default function ProfilePage() {
           Your immutable record of verified capabilities.
         </p>
       </motion.div>
+
+      <VerificationDiscrepancyPanel data={verification} />
 
       <div className="grid gap-6">
         {skills.map((skill, idx) => (

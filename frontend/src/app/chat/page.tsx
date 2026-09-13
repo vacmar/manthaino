@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Loader2 } from "lucide-react";
 
+import { api } from '@/lib/api';
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -35,13 +37,16 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
+      const me = await api.getMe();
+
       // Setup SSE stream
       const response = await fetch(`${process.env.NEXT_PUBLIC_AI_SERVICE_URL || 'http://localhost:8001'}/chat/tutor/stream`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage,
-          learner_id: 'L1',
+          learner_id: me.learner_id,
           node_id: 'n1',
         })
       });

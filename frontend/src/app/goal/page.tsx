@@ -4,14 +4,26 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Target, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api";
 
 export default function GoalPage() {
   const [goals, setGoals] = useState<{ title: string, active: boolean, progress: number }[] | null>(null);
 
   useEffect(() => {
-    fetch("/api/mock/goals")
-      .then(res => res.json())
-      .then(setGoals);
+    async function loadData() {
+      try {
+        const res = await api.getGoals();
+        setGoals(res);
+      } catch (err) {
+        console.error("Failed to load goals", err);
+        // Fallback for UI visualization if backend endpoint doesn't exist yet
+        setGoals([
+          { title: "Data Engineering Master", active: true, progress: 33 },
+          { title: "AI/ML Specialist", active: false, progress: 0 }
+        ]);
+      }
+    }
+    loadData();
   }, []);
 
   if (!goals) {

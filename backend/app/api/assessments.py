@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app.core.cache import get_redis_client
 from app.repository import state_repo
+from app.services.assessment_scoring import score_answers
 
 router = APIRouter(prefix="/assessments", tags=["Assessments"])
 logger = logging.getLogger(__name__)
@@ -77,10 +78,10 @@ def finalize_assessment(
     else:
         state = {"status": "in_progress", "answers": []}
 
-    # Calculate mock result
+    score = score_answers(state.get("answers", []))
     result = {
         "status": "completed",
-        "score": 85.0,  # Mock score
+        "score": score,
         "answers": state["answers"],
     }
 
@@ -105,8 +106,12 @@ def get_assessment_result(assessment_id: str):
     result = state_repo.get_assessment(assessment_id)
     if not result:
         raise HTTPException(status_code=404, detail="Assessment result not found")
+    if isinstance(result, str):
+        state_payload = json.loads(result)
+    else:
+        state_payload = result
     return {
         "message": "Assessment state retrieved",
         "assessment_id": assessment_id,
-        "state": json.loads(cast(str, result)),
+        "state": state_payload,
     }

@@ -1,3 +1,4 @@
+# Exasol Personal / host DB is used locally (exakit start). Set EXASOL_ENABLED=false in CI when running unit tests without Exasol.
 name: CI
 
 on:

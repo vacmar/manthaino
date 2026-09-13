@@ -5,10 +5,34 @@
 
 CREATE TABLE learners (
     learner_id VARCHAR(36) PRIMARY KEY,
+    account_id VARCHAR(50),
     name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    target_role_id VARCHAR(50),
+    target_domain VARCHAR(100),
+    experience_level VARCHAR(50),
+    prior_experience VARCHAR(50),
+    education VARCHAR(100),
+    learning_style VARCHAR(50),
+    weekly_time INT,
+    onboarding_completed BOOLEAN,
+    onboarding_version INT,
+    onboarding_completed_at VARCHAR(50),
+    goals VARCHAR(2000),
+    known_skills VARCHAR(2000),
+    interests VARCHAR(2000),
+    self_reported_proficiency VARCHAR(4000),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE accounts (
+    account_id VARCHAR(50) PRIMARY KEY,
+    email VARCHAR(255),
+    password_hash VARCHAR(255),
+    created_at VARCHAR(50),
+    updated_at VARCHAR(50),
+    is_active BOOLEAN
 );
 
 CREATE TABLE goals (
@@ -23,7 +47,7 @@ CREATE TABLE career_roles (
     role_id VARCHAR(36) PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     description VARCHAR(2000),
-    level VARCHAR(50) -- e.g., Junior, Mid, Senior
+    role_level VARCHAR(50) -- e.g., Junior, Mid, Senior (LEVEL is reserved in Exasol)
 );
 
 CREATE TABLE skills (

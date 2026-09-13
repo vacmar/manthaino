@@ -60,8 +60,24 @@ db: dict[str, Any] = {
                 "skill_cloud": 0.8,
                 "skill_stats": 0.7,
             },
-        }
+        },
+        "role_be": {
+            "role_id": "role_be",
+            "required_skills": {
+                "skill_py": 0.8,
+                "skill_sql": 0.7,
+            },
+        },
     },
+    "accounts": {},
+    "learners_by_id": {},
+    "learners_by_account": {},
+    "goals": {},
+    "learning_progress": {},
+    "verification_sessions": {},
+    "assessments": {},
+    "conversations": {},
+    "summaries": {},
     "learner_profiles": {"L1": {"target_role": "role_de"}},
     "lessons": {
         "n1": {
@@ -72,7 +88,15 @@ db: dict[str, Any] = {
         }
     },
     "mistakes": {},  # (learner_id, node_id) -> list of mistake dicts
-    "course_skills": {"c1": ["skill_py"], "c2": ["skill_sql"]},
+    "course_skills": {
+        "c1": ["skill_py"],
+        "c2": ["skill_sql"],
+        "c_py": ["skill_py"],
+        "c_sql": ["skill_sql"],
+        "c_dist": ["skill_dist"],
+        "c_cloud": ["skill_cloud"],
+        "c_stats": ["skill_stats"],
+    },
     "skills": {
         "skill_py": {"name": "Python"},
         "skill_sql": {"name": "SQL"},

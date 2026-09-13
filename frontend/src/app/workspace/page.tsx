@@ -1,17 +1,107 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { TerminalSquare, Send, Sparkles } from "lucide-react";
+import { TerminalSquare, Send, Sparkles, Loader2 } from "lucide-react";
+import { api } from "@/lib/api";
 
 export default function WorkspacePage() {
   const [details, setDetails] = useState<{ title: string, defaultCode: string } | null>(null);
   const [chat, setChat] = useState<{ role: "ai" | "user", content: string }[] | null>(null);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch("/api/mock/assessment").then(res => res.json()).then(setDetails);
-    fetch("/api/mock/chat").then(res => res.json()).then(setChat);
+    async function loadData() {
+      try {
+        const res = await api.startAssessment("eval_1");
+        // Mapping backend response to frontend UI expectations
+        // Assuming backend returns { title: ..., description: ... } 
+        // We will fallback to a default structure if it doesn't match perfectly yet
+        setDetails({
+          title: res.title || "Interactive Workspace",
+          defaultCode: res.defaultCode || "# Write your solution here\n"
+        });
+      } catch (err) {
+        console.error("Failed to load workspace", err);
+      }
+    }
+    loadData();
+    
+    // Initial chat
+    setChat([
+      { role: "ai", content: "I see you're working on the workspace! How can I assist you with this project?" }
+    ]);
   }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chat]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMessage = input;
+    setInput("");
+    setChat(prev => [...(prev || []), { role: "user", content: userMessage }]);
+    setIsLoading(true);
+
+    try {
+      const me = await api.getMe();
+      const response = await fetch(`${process.env.NEXT_PUBLIC_AI_SERVICE_URL || 'http://localhost:8001'}/chat/tutor/stream`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage,
+          learner_id: me.learner_id,
+          node_id: 'n1', // We would pass actual node_id here
+        })
+      });
+
+      if (!response.body) throw new Error("No response body");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let aiContent = "";
+      
+      setChat(prev => [...(prev || []), { role: "ai", content: "" }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+        
+        let currentEvent = "";
+        
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.substring(7).trim();
+          } else if (line.startsWith('data: ')) {
+            const data = line.substring(6);
+            if (currentEvent === 'token') {
+              const textChunk = data.replace(/\\n/g, '\n');
+              aiContent += textChunk;
+              setChat(prev => {
+                if (!prev) return prev;
+                const newMsgs = [...prev];
+                newMsgs[newMsgs.length - 1].content = aiContent;
+                return newMsgs;
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setChat(prev => [...(prev || []), { role: "ai", content: "Error connecting to AI service." }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!details || !chat) {
     return (
@@ -71,22 +161,30 @@ export default function WorkspacePage() {
                 ? "bg-card border border-border p-3 rounded-lg rounded-tl-none shadow-sm mr-8" 
                 : "bg-primary text-primary-foreground p-3 rounded-lg rounded-tr-none shadow-sm ml-8"}
             >
-              <p className="text-sm">{msg.content}</p>
+              <p className="text-sm whitespace-pre-wrap">{msg.content || (isLoading && idx === chat.length - 1 ? <Loader2 className="w-4 h-4 animate-spin opacity-50" /> : "")}</p>
             </div>
           ))}
+          <div ref={messagesEndRef} />
         </div>
 
         <div className="p-4 border-t border-border bg-card">
-          <div className="relative">
+          <form onSubmit={handleSubmit} className="relative">
             <input 
               type="text" 
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
               placeholder="Ask for a hint..." 
-              className="w-full bg-background border border-border rounded-lg pl-4 pr-10 py-2.5 text-sm outline-none focus:border-primary transition-colors"
+              className="w-full bg-background border border-border rounded-lg pl-4 pr-10 py-2.5 text-sm outline-none focus:border-primary transition-colors disabled:opacity-50"
+              disabled={isLoading}
             />
-            <button className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-primary transition-colors">
+            <button 
+              type="submit" 
+              disabled={!input.trim() || isLoading}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <Send className="w-4 h-4" />
             </button>
-          </div>
+          </form>
         </div>
       </motion.div>
     </div>

@@ -129,6 +129,94 @@ def _rank_courses(
     return final_sequence
 
 
+def _sync_learner_profile(learner_id: str, target_role_id: str | None):
+    if not target_role_id:
+        return
+    profiles = state_repo.db.setdefault("learner_profiles", {})
+    profiles[learner_id] = {"target_role": target_role_id}
+
+
+def generate_path_for_learner(learner_id: str, target_role_id: str | None = None) -> dict[str, Any]:
+    """Create the first active learning path for a learner."""
+    existing = state_repo.get_active_path(learner_id)
+    if existing:
+        nodes = state_repo.get_nodes_for_path(existing.path_id)
+        return {
+            "path_id": existing.path_id,
+            "version": existing.version,
+            "nodes": [n.model_dump() for n in nodes],
+            "created": False,
+        }
+
+    role_id = target_role_id
+    if not role_id:
+        learner = state_repo.get_learner(learner_id)
+        role_id = learner.target_role_id if learner else None
+    if not role_id:
+        role_id = "role_de"
+
+    _sync_learner_profile(learner_id, role_id)
+
+    proficiencies: dict[str, float] = {}
+    for skill_id in state_repo.db.get("skills", {}).keys():
+        prof = state_repo.get_learner_proficiency(learner_id, skill_id)
+        proficiencies[skill_id] = prof["proficiency"]
+
+    target_reqs = _get_target_role_requirements(learner_id)
+    required_courses: set[str] = set()
+    for skill, target in target_reqs.items():
+        if proficiencies.get(skill, 0.0) < target:
+            course = _get_available_course_for_skill(skill)
+            if course:
+                required_courses.add(course["course_id"])
+
+    _resolve_prerequisites_recursively(
+        learner_id, required_courses, set(), proficiencies
+    )
+
+    course_objects = [state_repo.db["courses"][cid] for cid in required_courses]
+    course_sequence = _rank_courses(course_objects, proficiencies, target_reqs)
+
+    # Demo paths: ensure Python is first when present
+    if "c_py" in course_sequence:
+        course_sequence = ["c_py"] + [c for c in course_sequence if c != "c_py"]
+
+    path_id = uuid.uuid4().hex
+    new_path = LearningPath(
+        path_id=path_id,
+        learner_id=learner_id,
+        version=1,
+        previous_path_id=None,
+        created_at=datetime.now(UTC).isoformat(),
+        is_active=True,
+    )
+    state_repo.save_path(new_path)
+
+    new_nodes: list[PathNode] = []
+    for seq, cid in enumerate(course_sequence, start=1):
+        status = NodeStatus.UNLOCKED if seq == 1 else NodeStatus.LOCKED
+        node = PathNode(
+            node_id=uuid.uuid4().hex,
+            path_id=path_id,
+            course_id=cid,
+            sequence_order=seq,
+            status=status,
+        )
+        new_nodes.append(node)
+        state_repo.update_node(node)
+
+    from app.services import unlock_service
+
+    unlock_service.check_unlocks(learner_id, path_id)
+
+    return {
+        "path_id": path_id,
+        "version": 1,
+        "nodes": [n.model_dump() for n in new_nodes],
+        "created": True,
+    }
+
+
 def regenerate_path(learner_id: str, current_path_id: str) -> dict[str, Any]:
     active_path = state_repo.get_active_path(learner_id)
     if not active_path:
@@ -191,6 +279,7 @@ def regenerate_path(learner_id: str, current_path_id: str) -> dict[str, Any]:
             "changed": False,
             "nodes": [n.model_dump() for n in nodes],
             "changes": [],
+            "change_facts": [],
             "proficiency_changes": [],
         }
 
@@ -276,5 +365,6 @@ def regenerate_path(learner_id: str, current_path_id: str) -> dict[str, Any]:
         "changed": True,
         "nodes": [n.model_dump() for n in new_nodes],
         "changes": changes,
+        "change_facts": changes,
         "proficiency_changes": prof_changes,
     }

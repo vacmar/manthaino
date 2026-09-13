@@ -38,7 +38,19 @@ class ProjectEvaluation(BaseModel):
 def get_project(project_id: str):
     project = state_repo.get_project(project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        # Auto-seed MVP project for UI testing
+        project = {
+            "title": "Build a Scalable Data Pipeline",
+            "description": "Apply your Data Engineering knowledge to build a robust, fault-tolerant data pipeline.",
+            "tasks": [
+                {"id": 1, "title": "Setup infrastructure (AWS S3 & EC2)", "completed": True},
+                {"id": 2, "title": "Deploy Apache Kafka", "completed": True},
+                {"id": 3, "title": "Create Spark Streaming job", "completed": False},
+                {"id": 4, "title": "Write unit and integration tests", "completed": False}
+            ]
+        }
+        # Ideally we'd save this to state_repo, but since it's just a mock dict for now:
+        return project
     return {"project_id": project_id, "project": project}
 
 

@@ -17,7 +17,7 @@ export default function LessonPage() {
   useEffect(() => {
     async function loadNode() {
       try {
-        const path = await api.getActivePath("L1");
+        const path = await api.getActivePath();
         const found = path.nodes.find(n => n.node_id === nodeId);
         if (found) setNode(found);
       } catch (err) {
@@ -32,7 +32,8 @@ export default function LessonPage() {
   const handleComplete = async () => {
     setCompleting(true);
     try {
-      await api.completeLesson("L1", nodeId);
+      const me = await api.getMe();
+      await api.completeLesson(me.learner_id, nodeId);
       router.push("/");
     } catch (err) {
       console.error(err);

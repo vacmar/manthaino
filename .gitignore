@@ -68,3 +68,8 @@ tmp-app/
 graphify-out/
 .venv/
 venv/
+exasol_dev1
+*.zip
+backend.zip
+ai-service.zip
+frontend/src.zip

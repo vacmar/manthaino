@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Target, Map, User, LayoutDashboard, BrainCircuit, Network, BookOpen, Briefcase } from "lucide-react";
+import { Target, User, LayoutDashboard, BrainCircuit, Network, BookOpen, Briefcase, BarChart3 } from "lucide-react";
 
 export function Navigation() {
   const pathname = usePathname();
@@ -13,6 +13,7 @@ export function Navigation() {
     { href: "/path", label: "Curriculum Map", icon: Network },
     { href: "/workspace", label: "Workspace", icon: BookOpen },
     { href: "/projects", label: "Projects", icon: Briefcase },
+    { href: "/progress", label: "Progress", icon: BarChart3 },
     { href: "/profile", label: "Profile", icon: User },
     { href: "/goal", label: "Goal", icon: Target },
   ];

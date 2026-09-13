@@ -7,6 +7,51 @@ from app.services import unlock_service
 from app.services.cache_service import invalidate_node_cache
 
 
+def build_resume_payload(learner_id: str, node_id: str) -> dict:
+    """Resume helper: module, concept, progress, weak concepts, next action."""
+    node = state_repo.get_node(node_id)
+    if not node:
+        raise ValueError("Node not found")
+
+    progress = state_repo.get_learning_progress(learner_id, node_id) or {}
+    context = state_repo.get_node_context(node_id) or {}
+    concepts = context.get("concepts") or progress.get("concepts") or []
+
+    mistakes = state_repo.get_mistakes(learner_id, node_id)
+    weak_map: dict[str, dict] = {}
+    for m in mistakes:
+        c = m["concept"]
+        if c not in weak_map:
+            weak_map[c] = {"concept": c, "error_count": 0}
+        weak_map[c]["error_count"] += 1
+
+    current_concept = progress.get("current_concept")
+    if not current_concept and concepts:
+        current_concept = concepts[0]
+
+    percent = float(progress.get("percent_complete", 0.0))
+    next_action = progress.get("next_action")
+    if not next_action:
+        if node.status == NodeStatus.IN_PROGRESS:
+            next_action = "continue_lesson"
+        elif node.status == NodeStatus.UNLOCKED:
+            next_action = "start_node"
+        elif node.status == NodeStatus.COMPLETED:
+            next_action = "review"
+        else:
+            next_action = "unlock_prerequisites"
+
+    return {
+        "node_id": node_id,
+        "module": progress.get("current_module", "lesson"),
+        "concept": current_concept,
+        "progress_percent": percent,
+        "weak_concepts": list(weak_map.values()),
+        "next_action": next_action,
+        "status": node.status.value,
+    }
+
+
 def attempt_completion(learner_id: str, node_id: str, req: CompletionRequest) -> dict:
     node = state_repo.get_node(node_id)
     if not node:

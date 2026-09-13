@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Play, CheckCircle2, CircleDashed } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { api } from "@/lib/api";
 
 export interface Node {
   id: string;
@@ -18,9 +20,36 @@ export default function DashboardPage() {
   const [data, setData] = useState<{ goal: string, progress: number, nodes: Node[] } | null>(null);
 
   useEffect(() => {
-    fetch("/api/mock/path")
-      .then(res => res.json())
-      .then(setData);
+    async function loadData() {
+      try {
+        const pathData = await api.getActivePath();
+        
+        const mappedNodes = pathData.nodes.map((n: any) => {
+          let status = "locked";
+          if (n.status === "COMPLETED") status = "completed";
+          if (n.status === "IN_PROGRESS" || n.status === "UNLOCKED") status = "active";
+          
+          return {
+            id: n.node_id,
+            title: n.course_id.replace('c_', '').toUpperCase(), // Simplified title mapping
+            status: status,
+            tier: n.sequence_order
+          } as Node;
+        }).sort((a, b) => a.tier - b.tier);
+
+        const completed = mappedNodes.filter(n => n.status === "completed").length;
+        const progress = mappedNodes.length > 0 ? Math.round((completed / mappedNodes.length) * 100) : 0;
+
+        setData({
+          goal: (pathData as any).goal || "Data Engineering Pathway",
+          progress,
+          nodes: mappedNodes
+        });
+      } catch (err) {
+        console.error("Failed to load pathway", err);
+      }
+    }
+    loadData();
   }, []);
 
   const container = {
@@ -86,10 +115,10 @@ export default function DashboardPage() {
               {node.status === "active" && (
                 <>
                   <Progress value={data.progress} className="h-2 mb-4" />
-                  <Button className="w-full gap-2">
+                  <Link href={`/lesson/${node.id}`} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
                     <Play className="w-4 h-4" />
                     Resume Learning
-                  </Button>
+                  </Link>
                 </>
               )}
             </div>

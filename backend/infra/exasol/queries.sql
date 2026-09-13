@@ -100,3 +100,31 @@ GROUP BY
     c.course_id, c.title, c.estimated_hours
 ORDER BY 
     efficiency_score DESC, gap_reduction_score DESC;
+
+
+-- 4. Course Coverage Analysis
+-- For a target role, shows how well each required skill is covered by catalogue courses.
+-- Variables: :role_id
+SELECT
+    rs.skill_id,
+    s.name AS skill_name,
+    rs.required_proficiency,
+    COUNT(DISTINCT cs.course_id) AS covering_courses,
+    COALESCE(SUM(cs.contribution_weight), 0.0) AS total_contribution_weight,
+    CASE
+        WHEN COALESCE(SUM(cs.contribution_weight), 0.0) >= rs.required_proficiency THEN 'COVERED'
+        WHEN COALESCE(SUM(cs.contribution_weight), 0.0) > 0 THEN 'PARTIAL'
+        ELSE 'UNCOVERED'
+    END AS coverage_status
+FROM
+    role_skills rs
+JOIN
+    skills s ON rs.skill_id = s.skill_id
+LEFT JOIN
+    course_skills cs ON cs.skill_id = rs.skill_id
+WHERE
+    rs.role_id = :role_id
+GROUP BY
+    rs.skill_id, s.name, rs.required_proficiency
+ORDER BY
+    coverage_status DESC, rs.required_proficiency DESC;
