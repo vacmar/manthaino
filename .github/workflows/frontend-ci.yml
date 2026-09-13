@@ -1,3 +1,5 @@
+# Local dev often uses Exasol Personal on the host (exakit start). CI unit jobs for
+# backend/ai-service can set EXASOL_ENABLED=false when no database is available.
 name: CI
 
 on:
@@ -22,11 +24,11 @@ jobs:
     - name: Lint
       run: |
         cd frontend
-        npm run lint || echo "Lint not strictly configured, passing"
+        npm run lint
     - name: Typecheck
       run: |
         cd frontend
-        npx tsc --noEmit || echo "Typecheck not fully strict, passing"
+        npx tsc --noEmit
     - name: Build Next.js
       run: |
         cd frontend

@@ -1,6 +1,8 @@
 # manthaino — Antigravity Phase Checklist
 
-Use `ANTIGRAVITY_MASTER_PROMPT.md` as the architecture contract. Execute these phases in order while allowing repositories to work in parallel.
+Use `ANTIGRAVITY_MASTER_PROMPT.md` as the architecture contract. Execute phases in order while allowing repositories to work in parallel.
+
+Phases **0–11** are the original build track. Phases **12+** are the remediation track after the first runnable local stack (see `deep-research-report.md`). Original phases may still be backfilled or merged.
 
 ## Phase 0 — GitHub organization
 
@@ -185,15 +187,62 @@ Every repo:
 - deployment
 - ownership
 
-## Phase 12 — Feature freeze
+## Phase 12 — Local runtime foundation
 
-Only:
-- bugs
-- tests
-- UX polish
-- performance
-- deployment
-- demo
-- documentation
+Shipped / harden:
 
-Do not introduce major architecture changes after feature freeze.
+- Exasol Personal on macOS (`exakit start`); avoid docker-db on Apple Silicon
+- Compose stack: redis, backend, ai-service, frontend → host Exasol
+- Schema/seed/apply scripts; auth accounts + learners in Exasol
+- Signup/login sessions (Redis); orphan learner repair
+- Cookie/CORS host alignment (`localhost`); Docker rebuild for `NEXT_PUBLIC_*`
+- Runtime docs/ADR; CI smoke hardening
+
+**Exit criteria:** signup → cookie session → `/auth/me` works on http://localhost:3000.
+
+## Phase 13 — Onboarding UX hardening ✅
+
+- [x] Fix skills/interests comma/space input bug (free-text; parse on submit)
+- [x] Learning style options (Visual / Hands-on / Reading / Mixed)
+- [x] Weekly time chips (5 / 10 / 15 / 20+)
+- [x] More roles + **Other** custom role
+- [x] Human-readable role titles in review
+- [x] Persist full onboarding profile (styles, interests, custom role)
+
+**Exit criteria:** onboarding completes without input bugs; review shows real labels.
+
+## Phase 14 — Path locking & richer curricula
+
+- Friendly course titles (no raw `C_PY` / `C_SQL` in UI)
+- Longer catalogue-backed paths from Exasol
+- Enforce lock/unlock/completion gates; one next recommended node
+- Rank/length using experience, skills, weekly time
+- Lock reasons on path UI
+
+**Exit criteria:** beginner path starts locked except first node; completion unlocks the next.
+
+## Phase 15 — Interactive mastery loop
+
+- Remove free Mark as Mastered
+- Lesson + tutor + exercises + assessment required for completion
+- Workspace bound to active node context
+- Progress reflects weak concepts and evidence
+
+**Exit criteria:** first node cannot complete without interactive learning evidence.
+
+## Phase 16 — Workspace execution & project validation
+
+- Sandboxed code execution API + UI Run
+- Real project submit/evaluate pipeline + mentor grounding
+- Evidence on pass written to learner profile
+
+**Exit criteria:** snippet run + project evaluation produce durable evidence.
+
+## Phase 17 — AI grounding, E2E polish, feature freeze
+
+- Tools grounded on Exasol gap/rank APIs
+- E2E: auth → onboard → learn → unlock → project
+- UX polish, docs, demo script
+- Then freeze: bugs, tests, performance, deployment, demo only
+
+**Exit criteria:** demo loop runs without mock-only shortcuts; major architecture frozen.

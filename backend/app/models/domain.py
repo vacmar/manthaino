@@ -13,9 +13,36 @@ class NodeStatus(str, Enum):
     REVIEW = "REVIEW"
 
 
+class Account(BaseModel):
+    account_id: str
+    email: str
+    password_hash: str
+    created_at: str
+    updated_at: str
+    is_active: bool = True
+
+
 class Learner(BaseModel):
     learner_id: str
+    account_id: str
     name: str
+    email: str | None = None
+    target_role_id: str | None = None
+    target_domain: str | None = None
+    goals: list[str] = []
+    experience_level: str | None = None
+    prior_experience: str | None = None
+    education: str | None = None
+    known_skills: list[str] = []
+    self_reported_proficiency: dict[str, float] = {}
+    interests: list[str] = []
+    learning_style: str | None = None
+    weekly_time: int | None = None
+    onboarding_completed: bool = False
+    onboarding_version: int = 1
+    onboarding_completed_at: str | None = None
+    created_at: str
+    updated_at: str
 
 
 class Skill(BaseModel):

@@ -1,6 +1,7 @@
 -- reset.sql
 -- Safely drop and recreate schema. Run this to clean the database before seeding.
 
+DROP TABLE IF EXISTS lesson_sessions CASCADE;
 DROP TABLE IF EXISTS messages CASCADE;
 DROP TABLE IF EXISTS conversations CASCADE;
 DROP TABLE IF EXISTS project_evaluations CASCADE;

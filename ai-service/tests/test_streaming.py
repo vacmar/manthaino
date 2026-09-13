@@ -18,12 +18,15 @@ async def test_tutor_tools_direct_invocation():
         res = await get_lesson_context.ainvoke({"node_id": "n1"})
         assert res["lesson"] == "Test context"
 
-    with patch.object(BackendClient, "_safe_post", new_callable=AsyncMock) as mock_post:
-        mock_post.return_value = {"status": "recorded"}
+    with patch(
+        "app.tools.registry.backend_client.record_mistake", new_callable=AsyncMock
+    ) as mock_rm:
+        mock_rm.return_value = {"status": "recorded"}
         res2 = await record_mistake.ainvoke(
             {"learner_id": "L1", "node_id": "n1", "concept": "X", "description": "Y"}
         )
         assert res2["status"] == "recorded"
+        mock_rm.assert_awaited()
 
 
 async def mock_astream_events_normal(*args, **kwargs):

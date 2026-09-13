@@ -60,6 +60,17 @@ def get_llm(
             tool_calls_sequence=mock_tool_calls or [],
         )
 
+    if selected_provider in {"huggingface", "hf", "hugging_face"}:
+        api_key = settings.huggingface_api_key or "hf_dummy_for_testing"
+        return ChatOpenAI(
+            base_url=settings.huggingface_base_url,
+            api_key=SecretStr(api_key),
+            model=model or settings.huggingface_model,
+            temperature=temp,
+            timeout=settings.request_timeout,
+            max_tokens=settings.max_tokens,
+        )
+
     if selected_provider == "groq":
         api_key = settings.groq_api_key or "gsk_dummy_for_testing"
         return ChatOpenAI(

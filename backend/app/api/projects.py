@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.api.auth import get_current_learner
 from app.repository import state_repo
 from app.services import project_service
 
@@ -32,6 +33,31 @@ class ProjectEvaluation(BaseModel):
     skills_demonstrated: list[SkillDemonstration]
     strengths: list[str]
     improvements: list[str]
+
+
+@router.get("/me/recommended")
+def get_recommended_project(learner=Depends(get_current_learner)):
+    profile = state_repo.db.get("learner_profiles", {}).get(learner.learner_id, {})
+    projects = state_repo.db.get("projects", {})
+
+    # Prefer AI-authored capstone for this learner
+    recommended_id = profile.get("recommended_project_id")
+    if recommended_id and recommended_id in projects:
+        return {"project_id": recommended_id, "project": projects[recommended_id]}
+
+    for project_id, project in projects.items():
+        if project.get("learner_id") == learner.learner_id:
+            return {"project_id": project_id, "project": project}
+
+    role = learner.target_role_id or "role_be"
+    path_role = profile.get("target_role", role)
+    for project_id, project in projects.items():
+        roles = project.get("roles") or []
+        if path_role in roles or role in roles:
+            return {"project_id": project_id, "project": project}
+    # fallback
+    first_id = next(iter(projects), "proj_1")
+    return {"project_id": first_id, "project": projects.get(first_id, {})}
 
 
 @router.get("/{project_id}")

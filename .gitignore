@@ -26,8 +26,9 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Do not ignore frontend/src/lib — only Python packaging dirs at repo roots
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -68,3 +69,8 @@ tmp-app/
 graphify-out/
 .venv/
 venv/
+exasol_dev1
+*.zip
+backend.zip
+ai-service.zip
+frontend/src.zip

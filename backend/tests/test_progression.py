@@ -81,14 +81,41 @@ def test_failed_completion_does_not_update_evidence():
 
 
 def test_lock_explanation_reports_missing_prerequisite():
+    # Sequence gate: previous node must be completed before skill prereqs matter
     res = client.get("/nodes/n2/unlock-conditions?learner_id=L1")
     assert res.status_code == 200
     data = res.json()
     assert data["locked"] is True
     assert len(data["reasons"]) == 1
-    assert data["reasons"][0]["prerequisite_skill"] == "skill_a"
-    assert data["reasons"][0]["required_proficiency"] == 0.8
-    assert data["reasons"][0]["current_proficiency"] == 0.0
+    assert data["reasons"][0]["status"] == "PRIOR_NODE_INCOMPLETE"
+    assert "Complete" in data["reasons"][0]["message"]
+
+    # After previous node is complete, skill threshold is the remaining lock reason
+    n1 = state_repo.get_node("n1")
+    n1.status = NodeStatus.COMPLETED
+    state_repo.update_node(n1)
+    n2 = state_repo.get_node("n2")
+    n2.status = NodeStatus.LOCKED
+    state_repo.update_node(n2)
+    state_repo.update_learner_proficiency("L1", "skill_a", 0.0, 0.0)
+
+    res2 = client.get("/nodes/n2/unlock-conditions?learner_id=L1")
+    data2 = res2.json()
+    assert data2["locked"] is True
+    assert data2["reasons"][0]["prerequisite_skill"] == "skill_a"
+    assert data2["reasons"][0]["required_proficiency"] == 0.8
+    assert "message" in data2["reasons"][0]
+
+
+def test_lock_explanation_only_cites_immediate_previous_node():
+    """Locked later tiers must not list every ancestor — only the previous node."""
+    res = client.get("/nodes/n3/unlock-conditions?learner_id=L1")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["locked"] is True
+    assert len(data["reasons"]) == 1
+    assert data["reasons"][0]["status"] == "PRIOR_NODE_INCOMPLETE"
+    assert data["reasons"][0]["prerequisite_skill"] == "c2"
 
 
 def test_prerequisite_threshold_unlocks_node():
