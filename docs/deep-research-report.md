@@ -1,6 +1,6 @@
 # Flaws, Gaps, and Remediation Phases
 
-This report captures product gaps found during local end-to-end runs (onboarding → path → lesson → workspace → projects), plus the runtime work already completed. Use it alongside `PHASES.md`.
+This report captures product gaps found during local end-to-end runs (onboarding → path → lesson → workspace → projects), plus the runtime work already completed.
 
 Phases **0–11** remain the original Antigravity build contract and can still be executed, merged, or backfilled. Phases **12+** below are the remediation track after the first runnable stack.
 

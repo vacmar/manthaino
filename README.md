@@ -4,11 +4,14 @@
 
 **Devjam deployment:** Exasol Personal → **Local** (`exakit` on your machine + Docker Compose for the app).
 
+**Team:** Why Not · **Track:** AI Agents That Get Things Done
+
 ---
 
 ## Table of contents
 
 - [Project overview](#project-overview)
+- [Demo video & pitch deck](#demo-video--pitch-deck)
 - [Setup instructions](#setup-instructions)
 - [Usage instructions](#usage-instructions)
 - [Stop / restart / rebuild](#stop--restart--rebuild)
@@ -70,6 +73,15 @@ mathaino/                 ← run all docker compose commands from here
 - Multi-track “Duolingo” role switcher: designed, not fully shipped in this window.
 - Sandboxed code Run / full auto project eval: not in this cut.
 - Paths are Redis-cached for fast restore; Exasol holds accounts (+ lesson sessions when connected).
+
+---
+
+## Demo video & pitch deck
+
+| Asset | Link |
+|-------|------|
+| **Demo video** | [Google Drive folder](https://drive.google.com/drive/folders/1gJi4xPHb1ambAe_zFNwnwIV2xQTDvYt1?usp=sharing) |
+| **Pitch deck** | [Google Drive folder](https://drive.google.com/drive/folders/1gJi4xPHb1ambAe_zFNwnwIV2xQTDvYt1?usp=sharing) |
 
 ---
 
@@ -276,8 +288,6 @@ Once setup verification passes:
 - After a backend rebuild, reload Dashboard (Redis usually restores the path) or use **Restore my path** on the lesson screen.
 - Wrong password shows a plain message (not raw JSON).
 
-**Demo video script (≤3 minutes):** [docs/demo-script.md](./docs/demo-script.md).
-
 ---
 
 ## Stop / restart / rebuild
@@ -321,10 +331,7 @@ docker compose logs ai-service --tail=200
 | Doc | Path |
 |-----|------|
 | Extra run detail | [docs/RUN_GUIDE.md](./docs/RUN_GUIDE.md) |
-| Demo script | [docs/demo-script.md](./docs/demo-script.md) |
-| Pitch deck content | [docs/PITCH_DECK_CONTENT.md](./docs/PITCH_DECK_CONTENT.md) |
 | Architecture / API | [docs/](./docs/) |
-| Phases | [spec/PHASES.md](./spec/PHASES.md) |
 
 Optional local tests:
 
