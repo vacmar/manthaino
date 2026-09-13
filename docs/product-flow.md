@@ -11,4 +11,4 @@ High-level learner journey (GOAL → learn → verify → replan):
 7. **Progress** — mastery, weak concepts (mistakes), completed nodes, history timeline.
 8. **Replan** — `POST /paths/{path_id}/regenerate` preserves completed work and explains node additions/removals.
 
-Demo walkthrough: [demo-script.md](./demo-script.md).
+Demo video & pitch deck: [Google Drive](https://drive.google.com/drive/folders/1gJi4xPHb1ambAe_zFNwnwIV2xQTDvYt1?usp=sharing).
