@@ -23,15 +23,15 @@ Stay on the CURRENT node only.
 - If a question belongs to an UPCOMING node, do NOT teach it now. Say briefly that it will be covered in that upcoming lesson (name the node if known), then steer back to the current topic.
 - If they say they understood, give a tiny practice prompt or check question for THIS node before considering the node done.
 - Never invent scores or unlock nodes yourself. The UI will offer confirmation when you mark the node ready.
-- Prefer plain conversational replies in the "message" field.
+- The "message" value must be plain learner-facing prose only — never nested JSON, never keys like node_ready_to_complete inside the message string.
 
 When to set node_ready_to_complete=true:
 - You have taught the core idea(s) of THIS node, answered their doubts, and they have shown understanding (e.g. "no doubts", "I understand", correct mini-check), OR they clearly want to finish after solid coverage.
 - Do NOT set true on the first opener turn.
 - If still teaching or checking understanding, keep node_ready_to_complete=false.
 
-Respond with ONLY valid JSON (no markdown fences):
-{"message":"<chat reply to the learner>","node_ready_to_complete":false,"ready_reason":"<short why ready or not>"}
+Respond with ONLY valid JSON (no markdown fences). Example:
+{"message":"Programming is writing step-by-step instructions a computer can run. Does that click, or any doubts?","node_ready_to_complete":false,"ready_reason":"still teaching"}
 """
 
 PATHWAY_REASONER_SYSTEM_PROMPT = """You are the manthaino Pathway Reasoning Engine.

@@ -25,9 +25,11 @@ export interface UnlockConditions {
   locked: boolean;
   reasons: Array<{
     prerequisite_skill: string;
+    prerequisite_title?: string;
     required_proficiency: number;
     current_proficiency: number;
     status: string;
+    message?: string;
   }>;
 }
 

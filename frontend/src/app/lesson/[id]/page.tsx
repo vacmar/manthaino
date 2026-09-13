@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api, PathNode } from "@/lib/api";
+import { RichNotesEditor } from "@/components/RichNotesEditor";
 import {
   ArrowLeft,
   Bot,
@@ -14,6 +15,8 @@ import {
   Save,
   NotebookPen,
   Sparkles,
+  PanelRightClose,
+  PanelRightOpen,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -30,6 +33,39 @@ const PLACEHOLDER_MSGS = new Set([
   "Starting your AI lesson…",
   "Preparing your AI lesson…",
 ]);
+
+/** Never show raw JSON envelopes from the tutor model. */
+function unwrapAssistantContent(raw: string): string {
+  const text = (raw || "").trim();
+  if (!(text.startsWith("{") && text.includes('"message"'))) return raw;
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed.message === "string") {
+      return unwrapAssistantContent(parsed.message);
+    }
+  } catch {
+    /* fall through */
+  }
+  const m =
+    text.match(/"message"\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*"node_ready/) ||
+    text.match(/"message"\s*:\s*"((?:\\.|[^"\\])*)"\s*}/);
+  if (m?.[1]) {
+    try {
+      return JSON.parse(`"${m[1]}"`);
+    } catch {
+      return m[1].replace(/\\"/g, '"').replace(/\\n/g, "\n");
+    }
+  }
+  return raw;
+}
+
+function notesAreEmpty(html: string): boolean {
+  const plain = html
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+  return plain.length === 0;
+}
 
 export default function LessonPage() {
   const params = useParams();
@@ -56,11 +92,16 @@ export default function LessonPage() {
   const [notesOpen, setNotesOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notesTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function persistMessages(next: ChatMsg[]) {
-    const clean = next.filter(
-      (m) => m.content?.trim() && !PLACEHOLDER_MSGS.has(m.content.trim())
-    );
+    const clean = next
+      .map((m) =>
+        m.role === "assistant"
+          ? { ...m, content: unwrapAssistantContent(m.content) }
+          : m
+      )
+      .filter((m) => m.content?.trim() && !PLACEHOLDER_MSGS.has(m.content.trim()));
     if (clean.length === 0) return;
     try {
       await api.saveLessonMessages(nodeId, clean, true);
@@ -74,6 +115,20 @@ export default function LessonPage() {
     persistTimer.current = setTimeout(() => {
       void persistMessages(next);
     }, 300);
+  }
+
+  function scheduleNotesSave(html: string) {
+    if (notesTimer.current) clearTimeout(notesTimer.current);
+    notesTimer.current = setTimeout(() => {
+      void (async () => {
+        try {
+          await api.saveLessonNotes(nodeId, html);
+          setNotesSavedAt(new Date().toLocaleTimeString());
+        } catch (err) {
+          console.error(err);
+        }
+      })();
+    }, 900);
   }
 
   async function markAiReady(ready: boolean, reason?: string) {
@@ -110,7 +165,10 @@ export default function LessonPage() {
             .filter((m) => m.role === "user" || m.role === "assistant")
             .map((m) => ({
               role: m.role as "user" | "assistant",
-              content: m.content,
+              content:
+                m.role === "assistant"
+                  ? unwrapAssistantContent(m.content)
+                  : m.content,
             }))
             .filter((m) => m.content?.trim() && !PLACEHOLDER_MSGS.has(m.content.trim()));
           setMessages(restored);
@@ -145,6 +203,7 @@ export default function LessonPage() {
     void loadPath(false);
     return () => {
       if (persistTimer.current) clearTimeout(persistTimer.current);
+      if (notesTimer.current) clearTimeout(notesTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeId]);
@@ -212,16 +271,23 @@ export default function LessonPage() {
           node_id: nodeId,
           history: history
             .filter((m) => !PLACEHOLDER_MSGS.has(m.content))
-            .map((m) => ({ role: m.role, content: m.content })),
+            .map((m) => ({
+              role: m.role,
+              content:
+                m.role === "assistant"
+                  ? unwrapAssistantContent(m.content)
+                  : m.content,
+            })),
           lesson_context: lessonContext,
         }),
       });
       if (!response.ok) throw new Error(`Tutor returned ${response.status}`);
       const data = await response.json();
-      const content =
+      const content = unwrapAssistantContent(
         (typeof data.message === "string" && data.message) ||
-        data.structured?.content ||
-        "What would you like to go over in this lesson?";
+          data.structured?.content ||
+          "What would you like to go over in this lesson?"
+      );
       const ready = Boolean(data.structured?.node_ready_to_complete);
       const reason = data.structured?.ready_reason as string | undefined;
       if (ready) void markAiReady(true, reason);
@@ -301,7 +367,7 @@ export default function LessonPage() {
     setCompleting(true);
     setError("");
     try {
-      if (practiceNotes.trim()) {
+      if (!notesAreEmpty(practiceNotes)) {
         await api.saveLessonNotes(nodeId, practiceNotes);
       }
       await persistMessages(messages);
@@ -315,11 +381,17 @@ export default function LessonPage() {
     }
   };
 
-  if (loading) return <div className="p-8 text-zinc-500">Loading lesson...</div>;
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center text-zinc-500">
+        Loading lesson...
+      </div>
+    );
+  }
 
   if (pathMissing || !node) {
     return (
-      <div className="p-8 max-w-xl mx-auto space-y-4">
+      <div className="h-screen p-8 max-w-xl mx-auto space-y-4">
         <Link
           href="/dashboard"
           className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors"
@@ -347,183 +419,205 @@ export default function LessonPage() {
   const completed = node.status === "COMPLETED";
 
   return (
-    <div className="h-[calc(100vh-2rem)] max-w-5xl mx-auto p-4 md:p-6 flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3 shrink-0">
+    <div className="h-screen flex flex-col bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-950/40 via-background to-background">
+      <header className="shrink-0 flex items-center justify-between gap-3 px-4 md:px-6 py-3 border-b border-border/40 bg-black/20 backdrop-blur-md">
         <Link
           href="/dashboard"
           className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors text-sm"
         >
           <ArrowLeft className="w-4 h-4" /> Pathway
         </Link>
-        <div className="text-right">
-          <p className="text-[11px] uppercase tracking-widest text-primary font-semibold">
-            {completed ? "Completed node" : "Active node"}
+        <div className="text-center min-w-0 flex-1 px-2">
+          <p className="text-[10px] uppercase tracking-widest text-primary font-semibold">
+            {completed ? "Completed node" : "Focus lesson"}
           </p>
-          <h1 className="text-lg md:text-xl font-bold text-white leading-tight">{title}</h1>
+          <h1 className="text-base md:text-lg font-bold text-white leading-tight truncate">
+            {title}
+          </h1>
         </div>
-      </div>
-
-      {/* Notes strip on top — stays visible when chat grows */}
-      <div className="shrink-0 rounded-2xl border border-border/60 bg-card/50 backdrop-blur-sm overflow-hidden">
         <button
           type="button"
           onClick={() => setNotesOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/5"
+          className="inline-flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white px-2 py-1.5 rounded-lg hover:bg-white/5"
+          title={notesOpen ? "Hide notes" : "Show notes"}
         >
-          <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
-            <NotebookPen className="w-4 h-4 text-primary" />
-            Practice notes
-          </span>
-          <span className="text-xs text-zinc-500">{notesOpen ? "Hide" : "Show"}</span>
+          {notesOpen ? (
+            <PanelRightClose className="w-4 h-4" />
+          ) : (
+            <PanelRightOpen className="w-4 h-4" />
+          )}
+          <span className="hidden sm:inline">Notes</span>
         </button>
-        {notesOpen && (
-          <div className="px-4 pb-4 space-y-3 border-t border-border/40 pt-3">
-            <textarea
-              className="w-full min-h-[88px] text-sm leading-relaxed bg-black/40 p-3 rounded-xl text-zinc-200 border border-white/10 whitespace-pre-wrap"
-              placeholder={"Key takeaways…\n• Idea\n• Example\n• Still unclear"}
-              value={practiceNotes}
-              disabled={locked}
-              onChange={(e) => {
-                setPracticeNotes(e.target.value);
-                setNotesSavedAt(null);
-              }}
-            />
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-zinc-500">
-                {notesSavedAt ? `Saved at ${notesSavedAt}` : "Notes save with this node"}
+      </header>
+
+      {error && (
+        <div className="mx-4 mt-3 p-3 rounded-xl bg-red-500/10 text-red-400 text-sm shrink-0">
+          {error}
+        </div>
+      )}
+
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row">
+        {/* Chat — primary column */}
+        <section className="flex-1 min-w-0 min-h-0 flex flex-col border-r border-border/30">
+          <div className="px-4 py-3 border-b border-border/40 flex items-center gap-3 shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
+              <Bot className="w-4 h-4 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-primary font-bold tracking-widest uppercase">
+                AI Lesson
               </p>
+              <p className="text-xs text-zinc-500 truncate">
+                Chat + notes saved to the database · sidebar hidden for focus
+              </p>
+            </div>
+          </div>
+
+          {locked ? (
+            <div className="flex-1 flex items-center justify-center text-muted-foreground gap-2 p-8">
+              <Lock className="w-4 h-4" /> Unlock this node to start the AI lesson.
+            </div>
+          ) : (
+            <>
+              <div className="flex-1 overflow-y-auto space-y-4 p-4 md:p-5">
+                {messages.map((msg, idx) => (
+                  <div
+                    key={`${msg.role}-${idx}`}
+                    className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+                  >
+                    <div
+                      className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center ${
+                        msg.role === "user" ? "bg-primary" : "bg-primary/20"
+                      }`}
+                    >
+                      {msg.role === "user" ? (
+                        <User className="w-4 h-4 text-white" />
+                      ) : (
+                        <Bot className="w-4 h-4 text-primary" />
+                      )}
+                    </div>
+                    <div
+                      className={`px-4 py-3 rounded-2xl text-sm leading-relaxed max-w-[85%] whitespace-pre-wrap ${
+                        msg.role === "user"
+                          ? "bg-primary text-white rounded-tr-none"
+                          : "bg-black/30 border border-white/10 text-zinc-300 rounded-tl-none"
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                {chatLoading && messages[messages.length - 1]?.role === "user" && (
+                  <div className="flex gap-3 items-center text-sm text-zinc-500">
+                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    Thinking…
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {aiReady && !completed && (
+                <div className="mx-4 mb-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+                  <div className="flex items-start gap-2 text-sm text-zinc-200">
+                    <Sparkles className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                    <span>
+                      The AI thinks you’ve covered this node. Confirm to unlock the next
+                      step and update Progress.
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleConfirmComplete}
+                    disabled={completing}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium disabled:opacity-50 shrink-0"
+                  >
+                    {completing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4" />
+                    )}
+                    Confirm mastery
+                  </button>
+                </div>
+              )}
+
+              {!aiReady && !completed && (
+                <p className="px-4 pb-1 text-[11px] text-zinc-500">
+                  Keep chatting until the tutor marks this node ready — there’s no free
+                  Complete button.
+                </p>
+              )}
+
+              {completed && (
+                <p className="px-4 pb-2 text-xs text-emerald-400/90 inline-flex items-center gap-1.5">
+                  <CheckCircle className="w-3.5 h-3.5" /> Node completed — you can still
+                  review the chat.
+                </p>
+              )}
+
+              <form
+                onSubmit={handleChatSubmit}
+                className="p-3 md:p-4 border-t border-border/50 relative shrink-0"
+              >
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ask a doubt, say you understood, or request an example…"
+                  disabled={chatLoading}
+                  className="w-full bg-black/40 border border-white/10 rounded-full pl-5 pr-14 py-3.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary/50"
+                />
+                <button
+                  type="submit"
+                  disabled={!input.trim() || chatLoading}
+                  className="absolute right-5 md:right-6 top-1/2 -translate-y-1/2 p-2.5 bg-primary hover:bg-primary/90 text-white rounded-full disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </form>
+            </>
+          )}
+        </section>
+
+        {/* Notes — right panel */}
+        {notesOpen && (
+          <aside className="w-full md:w-[380px] lg:w-[420px] shrink-0 min-h-[40vh] md:min-h-0 flex flex-col border-t md:border-t-0 border-border/40 bg-card/20">
+            <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between gap-2 shrink-0">
+              <span className="inline-flex items-center gap-2 text-sm font-medium text-white">
+                <NotebookPen className="w-4 h-4 text-primary" />
+                Lesson notes
+              </span>
               <button
                 type="button"
                 onClick={handleSaveNotes}
                 disabled={savingNotes || locked}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs text-white hover:bg-muted/40 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border text-xs text-white hover:bg-muted/40 disabled:opacity-50"
               >
-                {savingNotes ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                {savingNotes ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Save className="w-3.5 h-3.5" />
+                )}
                 Save
               </button>
             </div>
-          </div>
-        )}
-      </div>
-
-      {error && (
-        <div className="shrink-0 p-3 rounded-xl bg-red-500/10 text-red-400 text-sm">{error}</div>
-      )}
-
-      {/* Chat takes remaining height */}
-      <div className="flex-1 min-h-0 bg-card/40 border border-border/50 rounded-2xl flex flex-col overflow-hidden">
-        <div className="px-4 py-3 border-b border-border/50 flex items-center gap-3 shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
-            <Bot className="w-4 h-4 text-primary" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs text-primary font-bold tracking-widest uppercase">AI Lesson</p>
-            <p className="text-xs text-zinc-500 truncate">
-              Chat is saved · upcoming topics stay for later nodes
-            </p>
-          </div>
-        </div>
-
-        {locked ? (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground gap-2 p-8">
-            <Lock className="w-4 h-4" /> Unlock this node to start the AI lesson.
-          </div>
-        ) : (
-          <>
-            <div className="flex-1 overflow-y-auto space-y-4 p-4 md:p-5">
-              {messages.map((msg, idx) => (
-                <div
-                  key={`${msg.role}-${idx}`}
-                  className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-                >
-                  <div
-                    className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center ${
-                      msg.role === "user" ? "bg-primary" : "bg-primary/20"
-                    }`}
-                  >
-                    {msg.role === "user" ? (
-                      <User className="w-4 h-4 text-white" />
-                    ) : (
-                      <Bot className="w-4 h-4 text-primary" />
-                    )}
-                  </div>
-                  <div
-                    className={`px-4 py-3 rounded-2xl text-sm leading-relaxed max-w-[85%] whitespace-pre-wrap ${
-                      msg.role === "user"
-                        ? "bg-primary text-white rounded-tr-none"
-                        : "bg-black/30 border border-white/10 text-zinc-300 rounded-tl-none"
-                    }`}
-                  >
-                    {msg.content}
-                  </div>
-                </div>
-              ))}
-              {chatLoading && messages[messages.length - 1]?.role === "user" && (
-                <div className="flex gap-3 items-center text-sm text-zinc-500">
-                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                  Thinking…
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {aiReady && !completed && (
-              <div className="mx-4 mb-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-                <div className="flex items-start gap-2 text-sm text-zinc-200">
-                  <Sparkles className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                  <span>
-                    The AI thinks you’ve covered this node. Confirm to unlock the next step and
-                    update Progress.
-                  </span>
-                </div>
-                <button
-                  onClick={handleConfirmComplete}
-                  disabled={completing}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium disabled:opacity-50 shrink-0"
-                >
-                  {completing ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle className="w-4 h-4" />
-                  )}
-                  Confirm mastery
-                </button>
-              </div>
-            )}
-
-            {!aiReady && !completed && (
-              <p className="px-4 pb-1 text-[11px] text-zinc-500">
-                Keep chatting until the tutor marks this node ready — there’s no free Complete button.
-              </p>
-            )}
-
-            {completed && (
-              <p className="px-4 pb-2 text-xs text-emerald-400/90 inline-flex items-center gap-1.5">
-                <CheckCircle className="w-3.5 h-3.5" /> Node completed — you can still review the chat.
-              </p>
-            )}
-
-            <form
-              onSubmit={handleChatSubmit}
-              className="p-3 md:p-4 border-t border-border/50 relative shrink-0"
-            >
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask a doubt, say you understood, or request an example…"
-                disabled={chatLoading}
-                className="w-full bg-black/40 border border-white/10 rounded-full pl-5 pr-14 py-3.5 text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary/50"
+            <div className="flex-1 min-h-0 p-3 flex flex-col gap-2">
+              <RichNotesEditor
+                value={practiceNotes}
+                disabled={locked}
+                placeholder="Title, bullets, tables — notes auto-save to the DB…"
+                onChange={(html) => {
+                  setPracticeNotes(html);
+                  setNotesSavedAt(null);
+                  if (!locked) scheduleNotesSave(html);
+                }}
               />
-              <button
-                type="submit"
-                disabled={!input.trim() || chatLoading}
-                className="absolute right-5 md:right-6 top-1/2 -translate-y-1/2 p-2.5 bg-primary hover:bg-primary/90 text-white rounded-full disabled:opacity-50"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </form>
-          </>
+              <p className="text-[11px] text-zinc-500 px-1">
+                {notesSavedAt
+                  ? `Saved to database at ${notesSavedAt}`
+                  : "Formatting: title, bold, italic, lists, tables · stored in Exasol/Redis"}
+              </p>
+            </div>
+          </aside>
         )}
       </div>
     </div>

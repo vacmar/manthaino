@@ -48,7 +48,12 @@ export default function PathVisualizationPage() {
 
           return {
             id: n.node_id,
-            title: n.course_id.replace(/^c_/, "").replace(/_/g, " ").toUpperCase(),
+            title:
+              n.course_title ||
+              n.course_id
+                .replace(/^(c_|ai_)/i, "")
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase()),
             status,
             tier: n.sequence_order,
             lockReasons,
@@ -176,11 +181,18 @@ export default function PathVisualizationPage() {
                       Tier {node.tier} · {node.status}
                     </p>
                     {node.lockReasons && node.lockReasons.length > 0 && (
-                      <ul className="mt-3 text-xs text-muted-foreground space-y-1 border-t border-border pt-2">
+                      <ul className="mt-3 text-xs text-muted-foreground space-y-1.5 border-t border-border pt-2">
                         {node.lockReasons.map((r, ri) => (
-                          <li key={ri}>
-                            Needs {r.prerequisite_skill.replace(/^skill_/, "")}: {Math.round(r.current_proficiency * 100)}%
-                            /{Math.round(r.required_proficiency * 100)}% mastery
+                          <li key={ri} className="leading-snug">
+                            {r.message ||
+                              (r.status === "PRIOR_NODE_INCOMPLETE"
+                                ? `Complete “${r.prerequisite_title || r.prerequisite_skill}” first`
+                                : `Needs more mastery in ${
+                                    r.prerequisite_title ||
+                                    r.prerequisite_skill
+                                      .replace(/^(skill_|c_|ai_)/i, "")
+                                      .replace(/_/g, " ")
+                                  }`)}
                           </li>
                         ))}
                       </ul>

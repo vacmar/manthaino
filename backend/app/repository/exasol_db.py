@@ -137,6 +137,21 @@ def init_db() -> bool:
                     self_reported_proficiency VARCHAR(4000)
                 )
             """)
+
+            # Lesson workspace: rich notes + chat transcript (no FK to path_nodes —
+            # AI-generated node IDs may not live in Exasol path_nodes yet).
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS lesson_sessions (
+                    session_key VARCHAR(200) PRIMARY KEY,
+                    learner_id VARCHAR(50),
+                    node_id VARCHAR(100),
+                    practice_notes VARCHAR(2000000),
+                    messages_json VARCHAR(2000000),
+                    ai_ready BOOLEAN,
+                    ready_reason VARCHAR(1000),
+                    updated_at VARCHAR(50)
+                )
+            """)
         finally:
             conn.close()
         logger.info("Exasol schema initialized")
@@ -390,5 +405,125 @@ def update_learner(learner: Learner):
                 "self_reported_proficiency": json.dumps(learner.self_reported_proficiency),
             },
         )
+    finally:
+        conn.close()
+
+
+# ==========================================
+# Lesson sessions (notes + chat)
+# ==========================================
+
+
+def upsert_lesson_session(
+    *,
+    session_key: str,
+    learner_id: str,
+    node_id: str,
+    practice_notes: str | None = None,
+    messages: list | None = None,
+    ai_ready: bool | None = None,
+    ready_reason: str | None = None,
+    updated_at: str | None = None,
+) -> None:
+    """Insert or merge a lesson session row. None fields keep existing values."""
+    if not exasol_configured():
+        return
+    conn = get_connection(max_attempts=2, quick=True)
+    try:
+        existing = conn.execute(
+            """
+            SELECT practice_notes, messages_json, ai_ready, ready_reason
+            FROM lesson_sessions WHERE session_key = {session_key}
+            """,
+            {"session_key": session_key},
+        ).fetchone()
+
+        notes = practice_notes
+        msgs_json = json.dumps(messages) if messages is not None else None
+        ready = ai_ready
+        reason = ready_reason
+
+        if existing:
+            if notes is None:
+                notes = existing[0] or ""
+            if msgs_json is None:
+                msgs_json = existing[1] or "[]"
+            if ready is None:
+                ready = bool(existing[2]) if existing[2] is not None else False
+            if reason is None:
+                reason = existing[3]
+            conn.execute(
+                """
+                UPDATE lesson_sessions SET
+                    practice_notes = {practice_notes},
+                    messages_json = {messages_json},
+                    ai_ready = {ai_ready},
+                    ready_reason = {ready_reason},
+                    updated_at = {updated_at}
+                WHERE session_key = {session_key}
+                """,
+                {
+                    "session_key": session_key,
+                    "practice_notes": notes or "",
+                    "messages_json": msgs_json or "[]",
+                    "ai_ready": bool(ready),
+                    "ready_reason": reason,
+                    "updated_at": updated_at or "",
+                },
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO lesson_sessions (
+                    session_key, learner_id, node_id, practice_notes, messages_json,
+                    ai_ready, ready_reason, updated_at
+                ) VALUES (
+                    {session_key}, {learner_id}, {node_id}, {practice_notes}, {messages_json},
+                    {ai_ready}, {ready_reason}, {updated_at}
+                )
+                """,
+                {
+                    "session_key": session_key,
+                    "learner_id": learner_id,
+                    "node_id": node_id,
+                    "practice_notes": notes or "",
+                    "messages_json": msgs_json or "[]",
+                    "ai_ready": bool(ready) if ready is not None else False,
+                    "ready_reason": reason,
+                    "updated_at": updated_at or "",
+                },
+            )
+    finally:
+        conn.close()
+
+
+def get_lesson_session(session_key: str) -> dict | None:
+    if not exasol_configured():
+        return None
+    conn = get_connection(max_attempts=1, quick=True)
+    try:
+        row = conn.execute(
+            """
+            SELECT learner_id, node_id, practice_notes, messages_json,
+                   ai_ready, ready_reason, updated_at
+            FROM lesson_sessions WHERE session_key = {session_key}
+            """,
+            {"session_key": session_key},
+        ).fetchone()
+        if not row:
+            return None
+        try:
+            messages = json.loads(row[3] or "[]")
+        except (json.JSONDecodeError, TypeError):
+            messages = []
+        return {
+            "learner_id": row[0],
+            "node_id": row[1],
+            "practice_notes": row[2] or "",
+            "messages": messages if isinstance(messages, list) else [],
+            "ai_ready": bool(row[4]) if row[4] is not None else False,
+            "ready_reason": row[5],
+            "updated_at": row[6],
+        }
     finally:
         conn.close()

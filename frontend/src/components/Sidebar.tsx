@@ -21,8 +21,12 @@ export function Sidebar() {
     }
   }, [pathname, router]);
 
-  // Hide sidebar on auth pages, onboarding, or landing page (if you don't want it there)
-  if (pathname.startsWith('/auth') || pathname.startsWith('/onboarding')) {
+  // Hide sidebar on auth, onboarding, and focus lesson workspace
+  if (
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/onboarding") ||
+    pathname.startsWith("/lesson")
+  ) {
     return null;
   }
 

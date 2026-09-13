@@ -170,28 +170,165 @@ def lesson_conversation_id(learner_id: str, node_id: str) -> str:
     return f"lesson:{learner_id}:{node_id}"
 
 
+def _lesson_session_key(learner_id: str, node_id: str) -> str:
+    return f"{learner_id}:{node_id}"
+
+
+LESSON_REDIS_TTL = 60 * 60 * 24 * 14  # 14 days
+
+
+def _redis_lesson_key(learner_id: str, node_id: str) -> str:
+    return f"lesson_session:{learner_id}:{node_id}"
+
+
+def _sync_lesson_session(
+    learner_id: str,
+    node_id: str,
+    *,
+    notes: str | None = None,
+    messages: list | None = None,
+    meta: dict | None = None,
+) -> None:
+    """Best-effort durable write to Redis + Exasol (survives backend restart)."""
+    key = _lesson_session_key(learner_id, node_id)
+    payload = {
+        "practice_notes": notes
+        if notes is not None
+        else db.setdefault("lesson_notes", {}).get(key, ""),
+        "messages": messages
+        if messages is not None
+        else list(db.setdefault("conversations", {}).get(lesson_conversation_id(learner_id, node_id), [])),
+        "meta": meta
+        if meta is not None
+        else dict(db.setdefault("lesson_meta", {}).get(key) or {}),
+    }
+    try:
+        from app.core.cache import get_redis_client
+        import json
+
+        cache = get_redis_client()
+        cache.set(_redis_lesson_key(learner_id, node_id), json.dumps(payload), ex=LESSON_REDIS_TTL)
+    except Exception as e:
+        logger.warning("Redis lesson sync failed: %s", e)
+
+    try:
+        if exasol_db.exasol_configured():
+            m = payload["meta"] or {}
+            from datetime import UTC, datetime
+
+            exasol_db.upsert_lesson_session(
+                session_key=key,
+                learner_id=learner_id,
+                node_id=node_id,
+                practice_notes=str(payload["practice_notes"] or ""),
+                messages=list(payload["messages"] or []),
+                ai_ready=bool(m.get("ai_ready")),
+                ready_reason=m.get("ready_reason"),
+                updated_at=datetime.now(UTC).isoformat(),
+            )
+    except Exception as e:
+        logger.warning("Exasol lesson sync failed: %s", e)
+
+
+def _hydrate_lesson_from_durable(learner_id: str, node_id: str) -> None:
+    """If RAM is empty, restore notes/messages/meta from Redis then Exasol."""
+    key = _lesson_session_key(learner_id, node_id)
+    conv_id = lesson_conversation_id(learner_id, node_id)
+    has_notes = bool(db.setdefault("lesson_notes", {}).get(key))
+    has_msgs = bool(db.setdefault("conversations", {}).get(conv_id))
+    has_meta = bool(db.setdefault("lesson_meta", {}).get(key))
+    if has_notes and has_msgs and has_meta:
+        return
+
+    payload = None
+    try:
+        from app.core.cache import get_redis_client
+        import json
+
+        raw = get_redis_client().get(_redis_lesson_key(learner_id, node_id))
+        if raw:
+            payload = json.loads(raw)
+    except Exception as e:
+        logger.warning("Redis lesson hydrate failed: %s", e)
+
+    if not payload:
+        try:
+            if exasol_db.exasol_configured():
+                row = exasol_db.get_lesson_session(key)
+                if row:
+                    payload = {
+                        "practice_notes": row.get("practice_notes") or "",
+                        "messages": row.get("messages") or [],
+                        "meta": {
+                            "ai_ready": row.get("ai_ready"),
+                            "ready_reason": row.get("ready_reason"),
+                        },
+                    }
+        except Exception as e:
+            logger.warning("Exasol lesson hydrate failed: %s", e)
+
+    if not payload:
+        return
+
+    if not has_notes and payload.get("practice_notes"):
+        db.setdefault("lesson_notes", {})[key] = payload["practice_notes"]
+    if not has_msgs and payload.get("messages"):
+        db.setdefault("conversations", {})[conv_id] = list(payload["messages"])
+    if not has_meta and payload.get("meta"):
+        db.setdefault("lesson_meta", {})[key] = dict(payload["meta"])
+
+
 def get_lesson_notes(learner_id: str, node_id: str) -> str:
-    key = f"{learner_id}:{node_id}"
+    _hydrate_lesson_from_durable(learner_id, node_id)
+    key = _lesson_session_key(learner_id, node_id)
     return cast(str, db.setdefault("lesson_notes", {}).get(key, "") or "")
 
 
 def save_lesson_notes(learner_id: str, node_id: str, notes: str) -> str:
-    key = f"{learner_id}:{node_id}"
+    key = _lesson_session_key(learner_id, node_id)
     db.setdefault("lesson_notes", {})[key] = notes
+    _sync_lesson_session(learner_id, node_id, notes=notes)
     return notes
 
 
 def get_lesson_meta(learner_id: str, node_id: str) -> dict:
-    key = f"{learner_id}:{node_id}"
+    _hydrate_lesson_from_durable(learner_id, node_id)
+    key = _lesson_session_key(learner_id, node_id)
     return dict(db.setdefault("lesson_meta", {}).get(key) or {})
 
 
 def save_lesson_meta(learner_id: str, node_id: str, meta: dict) -> dict:
-    key = f"{learner_id}:{node_id}"
+    key = _lesson_session_key(learner_id, node_id)
     current = dict(db.setdefault("lesson_meta", {}).get(key) or {})
     current.update(meta)
     db.setdefault("lesson_meta", {})[key] = current
+    _sync_lesson_session(learner_id, node_id, meta=current)
     return current
+
+
+def replace_lesson_messages(learner_id: str, node_id: str, messages: list) -> list:
+    """Replace the full lesson transcript and sync to durable stores."""
+    conv_id = lesson_conversation_id(learner_id, node_id)
+    cleaned = []
+    for msg in messages:
+        content = (msg.get("content") or "").strip()
+        if not content:
+            continue
+        if content in {
+            "Starting your AI lesson…",
+            "Preparing your AI lesson…",
+        }:
+            continue
+        cleaned.append(
+            {
+                "role": msg.get("role"),
+                "content": content,
+                "created_at": msg.get("created_at"),
+            }
+        )
+    db.setdefault("conversations", {})[conv_id] = cleaned
+    _sync_lesson_session(learner_id, node_id, messages=cleaned)
+    return cleaned
 
 
 # --- Assessments ---

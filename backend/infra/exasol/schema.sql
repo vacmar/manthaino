@@ -207,3 +207,16 @@ CREATE TABLE messages (
     metadata VARCHAR(4000), -- JSON payload for tools or context
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Focus lesson workspace (rich HTML notes + chat JSON). No FK to path_nodes
+-- because AI-generated node IDs may not exist in Exasol path_nodes yet.
+CREATE TABLE lesson_sessions (
+    session_key VARCHAR(200) PRIMARY KEY,
+    learner_id VARCHAR(50),
+    node_id VARCHAR(100),
+    practice_notes VARCHAR(2000000),
+    messages_json VARCHAR(2000000),
+    ai_ready BOOLEAN,
+    ready_reason VARCHAR(1000),
+    updated_at VARCHAR(50)
+);

@@ -77,6 +77,37 @@ def _heuristic_ready(req: ChatRequest) -> bool:
     return any(a in last_user for a in affirm)
 
 
+def _normalize_assistant_text(raw: str, parsed: dict[str, Any] | None) -> tuple[str, bool, str]:
+    """Always return learner-facing prose, never raw JSON."""
+    if parsed and parsed.get("message") is not None:
+        text = str(parsed.get("message") or "").strip()
+        # If model nested JSON again inside message, unwrap once more
+        nested = _extract_json(text)
+        if nested and nested.get("message"):
+            text = str(nested.get("message") or "").strip()
+            ready = bool(nested.get("node_ready_to_complete", parsed.get("node_ready_to_complete")))
+            reason = str(nested.get("ready_reason") or parsed.get("ready_reason") or "")
+            return text, ready, reason
+        ready = bool(parsed.get("node_ready_to_complete"))
+        reason = str(parsed.get("ready_reason") or "")
+        return text, ready, reason
+
+    # Raw body looked like JSON but failed parse — strip braces heuristically
+    stripped = raw.strip()
+    if stripped.startswith("{") and '"message"' in stripped:
+        m = re.search(r'"message"\s*:\s*"(.*)"\s*,\s*"node_ready', stripped, re.DOTALL)
+        if not m:
+            m = re.search(r'"message"\s*:\s*"(.*?)"\s*}', stripped, re.DOTALL)
+        if m:
+            try:
+                text = json.loads(f'"{m.group(1)}"')
+            except json.JSONDecodeError:
+                text = m.group(1).replace('\\"', '"').replace("\\n", "\n")
+            ready = '"node_ready_to_complete": true' in stripped.lower().replace(" ", "")
+            return text.strip(), ready, "heuristic_unwrap"
+    return stripped or "I'm here — tell me what part you'd like to go over again.", False, "plain_text_reply"
+
+
 async def run_lesson_chat(req: ChatRequest) -> ChatResponse:
     """Reply in a live conversational lesson, grounded to the current node."""
     system = (
@@ -90,6 +121,11 @@ async def run_lesson_chat(req: ChatRequest) -> ChatResponse:
         content = (turn.get("content") or "").strip()
         if not content:
             continue
+        # Never feed raw JSON blobs back into history
+        if content.lstrip().startswith("{") and '"message"' in content:
+            nested = _extract_json(content)
+            if nested and nested.get("message"):
+                content = str(nested["message"])
         if role == "user":
             messages.append(HumanMessage(content=content))
         elif role == "assistant":
@@ -102,15 +138,7 @@ async def run_lesson_chat(req: ChatRequest) -> ChatResponse:
         response = await llm.ainvoke(messages)
         raw = str(response.content or "").strip()
         parsed = _extract_json(raw) if raw else None
-
-        if parsed and parsed.get("message"):
-            text = str(parsed.get("message") or "").strip()
-            ready = bool(parsed.get("node_ready_to_complete"))
-            reason = str(parsed.get("ready_reason") or "")
-        else:
-            text = raw or "I'm here — tell me what part you'd like to go over again."
-            ready = False
-            reason = "plain_text_reply"
+        text, ready, reason = _normalize_assistant_text(raw, parsed)
 
         if not ready:
             ready = _heuristic_ready(req)
