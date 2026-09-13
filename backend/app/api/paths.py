@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
-from app.repository import state_repo
+
 from app.api.auth import get_current_learner
 from app.models.domain import Learner
+from app.repository import state_repo
 
 router = APIRouter(prefix="/paths", tags=["Paths"])
 

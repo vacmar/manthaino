@@ -1,7 +1,8 @@
 import logging
 from typing import cast
 
-from app.models.domain import PathNode, LearningPath, Account, Learner
+from app.models.domain import Account, Learner, LearningPath, PathNode
+
 from . import exasol_db
 from .mock_db import db
 
@@ -39,7 +40,9 @@ def get_account_by_email(email: str) -> Account | None:
         try:
             return exasol_db.get_account_by_email(email)
         except Exception as e:
-            logger.warning("Exasol get_account_by_email failed, using mock store: %s", e)
+            logger.warning(
+                "Exasol get_account_by_email failed, using mock store: %s", e
+            )
     for acc in db.get("accounts", {}).values():
         if acc.email == email:
             return acc
@@ -84,7 +87,9 @@ def get_learner_by_account(account_id: str) -> Learner | None:
             if found:
                 return found
         except Exception as e:
-            logger.warning("Exasol get_learner_by_account failed, using mock store: %s", e)
+            logger.warning(
+                "Exasol get_learner_by_account failed, using mock store: %s", e
+            )
     return db.get("learners_by_account", {}).get(account_id)
 
 
@@ -96,6 +101,7 @@ def update_learner(learner: Learner):
         except Exception as e:
             logger.warning("Exasol update_learner failed, using mock store: %s", e)
     _save_learner_mock(learner)
+
 
 PATH_REDIS_TTL = 60 * 60 * 24 * 30  # 30 days
 
@@ -150,7 +156,7 @@ def _hydrate_path_from_redis(learner_id: str) -> bool:
         raw = get_redis_client().get(_path_redis_key(learner_id))
         if not raw:
             return False
-        payload = json.loads(raw)
+        payload = json.loads(str(raw))
     except Exception as e:
         logger.warning("Redis path hydrate failed: %s", e)
         return False
@@ -301,31 +307,41 @@ def _sync_lesson_session(
         else db.setdefault("lesson_notes", {}).get(key, ""),
         "messages": messages
         if messages is not None
-        else list(db.setdefault("conversations", {}).get(lesson_conversation_id(learner_id, node_id), [])),
+        else list(
+            db.setdefault("conversations", {}).get(
+                lesson_conversation_id(learner_id, node_id), []
+            )
+        ),
         "meta": meta
         if meta is not None
         else dict(db.setdefault("lesson_meta", {}).get(key) or {}),
     }
     try:
-        from app.core.cache import get_redis_client
         import json
 
+        from app.core.cache import get_redis_client
+
         cache = get_redis_client()
-        cache.set(_redis_lesson_key(learner_id, node_id), json.dumps(payload), ex=LESSON_REDIS_TTL)
+        cache.set(
+            _redis_lesson_key(learner_id, node_id),
+            json.dumps(payload),
+            ex=LESSON_REDIS_TTL,
+        )
     except Exception as e:
         logger.warning("Redis lesson sync failed: %s", e)
 
     try:
         if exasol_db.exasol_configured():
-            m = payload["meta"] or {}
+            m_raw = payload.get("meta")
+            m = m_raw if isinstance(m_raw, dict) else {}
             from datetime import UTC, datetime
 
             exasol_db.upsert_lesson_session(
                 session_key=key,
                 learner_id=learner_id,
                 node_id=node_id,
-                practice_notes=str(payload["practice_notes"] or ""),
-                messages=list(payload["messages"] or []),
+                practice_notes=str(payload.get("practice_notes") or ""),
+                messages=list(payload.get("messages") or []),
                 ai_ready=bool(m.get("ai_ready")),
                 ready_reason=m.get("ready_reason"),
                 updated_at=datetime.now(UTC).isoformat(),
@@ -346,12 +362,13 @@ def _hydrate_lesson_from_durable(learner_id: str, node_id: str) -> None:
 
     payload = None
     try:
-        from app.core.cache import get_redis_client
         import json
+
+        from app.core.cache import get_redis_client
 
         raw = get_redis_client().get(_redis_lesson_key(learner_id, node_id))
         if raw:
-            payload = json.loads(raw)
+            payload = json.loads(str(raw))
     except Exception as e:
         logger.warning("Redis lesson hydrate failed: %s", e)
 
@@ -580,7 +597,9 @@ def get_goal(goal_id: str) -> dict | None:
 
 
 def get_goals_for_learner(learner_id: str) -> list:
-    return [g for g in db.get("goals", {}).values() if g.get("learner_id") == learner_id]
+    return [
+        g for g in db.get("goals", {}).values() if g.get("learner_id") == learner_id
+    ]
 
 
 # --- Learning progress ---
@@ -605,6 +624,9 @@ def get_verification_session(session_id: str) -> dict | None:
 
 def get_verification_session_for_skill(learner_id: str, skill_id: str) -> dict | None:
     for session in db.get("verification_sessions", {}).values():
-        if session.get("learner_id") == learner_id and session.get("skill_id") == skill_id:
+        if (
+            session.get("learner_id") == learner_id
+            and session.get("skill_id") == skill_id
+        ):
             return session
     return None

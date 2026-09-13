@@ -141,10 +141,6 @@ class ChatRequest(BaseModel):
         default=None,
         description="Current/upcoming node titles and goal for scoped tutoring",
     )
-    history: list[dict[str, str]] = Field(
-        default_factory=list,
-        description="Recent chat turns [{role, content}] for multi-turn lesson tutoring",
-    )
     lesson_title: str | None = Field(
         default=None, description="Human title of the active learning node"
     )

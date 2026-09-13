@@ -36,7 +36,12 @@ def build_path_generate_payload(
     domain = learner.target_domain or ""
     if domain.startswith("Custom role:"):
         parts = [p.strip() for p in domain.split("|")]
-        domain = " | ".join(p for p in parts if not p.lower().startswith("custom role:")).strip() or None
+        domain = (
+            " | ".join(
+                p for p in parts if not p.lower().startswith("custom role:")
+            ).strip()
+            or None
+        )
 
     return {
         "learner_id": learner.learner_id,
@@ -58,7 +63,9 @@ def build_path_generate_payload(
     }
 
 
-def request_ai_pathway(payload: dict[str, Any], timeout: float = 45.0) -> dict[str, Any]:
+def request_ai_pathway(
+    payload: dict[str, Any], timeout: float = 45.0
+) -> dict[str, Any]:
     """POST /path/generate and return the PathwayExplanation JSON."""
     url = f"{_ai_base_url()}/path/generate"
     with httpx.Client(timeout=timeout) as client:

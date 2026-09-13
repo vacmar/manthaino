@@ -77,7 +77,9 @@ def _heuristic_ready(req: ChatRequest) -> bool:
     return any(a in last_user for a in affirm)
 
 
-def _normalize_assistant_text(raw: str, parsed: dict[str, Any] | None) -> tuple[str, bool, str]:
+def _normalize_assistant_text(
+    raw: str, parsed: dict[str, Any] | None
+) -> tuple[str, bool, str]:
     """Always return learner-facing prose, never raw JSON."""
     if parsed and parsed.get("message") is not None:
         text = str(parsed.get("message") or "").strip()
@@ -85,7 +87,11 @@ def _normalize_assistant_text(raw: str, parsed: dict[str, Any] | None) -> tuple[
         nested = _extract_json(text)
         if nested and nested.get("message"):
             text = str(nested.get("message") or "").strip()
-            ready = bool(nested.get("node_ready_to_complete", parsed.get("node_ready_to_complete")))
+            ready = bool(
+                nested.get(
+                    "node_ready_to_complete", parsed.get("node_ready_to_complete")
+                )
+            )
             reason = str(nested.get("ready_reason") or parsed.get("ready_reason") or "")
             return text, ready, reason
         ready = bool(parsed.get("node_ready_to_complete"))
@@ -103,9 +109,15 @@ def _normalize_assistant_text(raw: str, parsed: dict[str, Any] | None) -> tuple[
                 text = json.loads(f'"{m.group(1)}"')
             except json.JSONDecodeError:
                 text = m.group(1).replace('\\"', '"').replace("\\n", "\n")
-            ready = '"node_ready_to_complete": true' in stripped.lower().replace(" ", "")
+            ready = '"node_ready_to_complete": true' in stripped.lower().replace(
+                " ", ""
+            )
             return text.strip(), ready, "heuristic_unwrap"
-    return stripped or "I'm here — tell me what part you'd like to go over again.", False, "plain_text_reply"
+    return (
+        stripped or "I'm here — tell me what part you'd like to go over again.",
+        False,
+        "plain_text_reply",
+    )
 
 
 async def run_lesson_chat(req: ChatRequest) -> ChatResponse:

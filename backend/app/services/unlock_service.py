@@ -54,11 +54,7 @@ def _evaluate_prereqs(learner_id: str, course_id: str) -> list:
 
 def check_unlocks(learner_id: str, path_id: str) -> list[str]:
     """Unlock the next path node only after prior nodes in sequence are COMPLETED."""
-    nodes = [
-        n
-        for n in state_repo.db["nodes"].values()
-        if n.path_id == path_id
-    ]
+    nodes = [n for n in state_repo.db["nodes"].values() if n.path_id == path_id]
     nodes.sort(key=lambda n: n.sequence_order)
 
     unlocked_nodes: list[str] = []

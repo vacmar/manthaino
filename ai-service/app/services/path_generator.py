@@ -68,9 +68,12 @@ def _skill_covered(known: set[str], name: str, skills: list[str]) -> bool:
                 return True
             # Phrase containment only when both look like multi-token topics
             # and neither is a strict prefix trap (react vs react native)
-            if " " in k_norm and " " in a_norm:
-                if k_norm in a_norm or a_norm in k_norm:
-                    return True
+            if (
+                " " in k_norm
+                and " " in a_norm
+                and (k_norm in a_norm or a_norm in k_norm)
+            ):
+                return True
             # Single-token: only exact match (already handled) — do not
             # let "react" consume "react native" or "java" consume "javascript"
     return False
@@ -160,8 +163,10 @@ def _generic_role_path(req: PathGenerateRequest) -> PathwayExplanation:
         raw.append(
             (
                 f"{interest} in Practice",
-                f"Lean into the learner's interest in {interest} while progressing toward {role} "
-                f"({style} learning style).",
+                (
+                    f"Lean into the learner's interest in {interest} while progressing toward {role} "
+                    f"({style} learning style)."
+                ),
                 [interest],
             )
         )
@@ -550,7 +555,9 @@ def _data_path(req: PathGenerateRequest) -> PathwayExplanation:
     )
 
 
-def _parse_pathway(data: dict[str, Any], req: PathGenerateRequest) -> PathwayExplanation:
+def _parse_pathway(
+    data: dict[str, Any], req: PathGenerateRequest
+) -> PathwayExplanation:
     stages_raw = data.get("stages") or []
     stages: list[PathwayStage] = []
     for i, s in enumerate(stages_raw):
@@ -558,7 +565,9 @@ def _parse_pathway(data: dict[str, Any], req: PathGenerateRequest) -> PathwayExp
             stages.append(
                 PathwayStage(
                     stage_number=int(s.get("stage_number", i + 1)),
-                    course_name=str(s.get("course_name") or s.get("title") or f"Stage {i + 1}"),
+                    course_name=str(
+                        s.get("course_name") or s.get("title") or f"Stage {i + 1}"
+                    ),
                     rationale=str(s.get("rationale") or "Curriculum progression"),
                     target_skills=list(s.get("target_skills") or []),
                 )

@@ -18,7 +18,9 @@ class GoalCreateRequest(BaseModel):
 
 
 @router.post("/")
-def create_goal(req: GoalCreateRequest, learner: Learner = Depends(get_current_learner)):
+def create_goal(
+    req: GoalCreateRequest, learner: Learner = Depends(get_current_learner)
+):
     goal_id = uuid.uuid4().hex
     now = datetime.now(UTC).isoformat()
     goal = {

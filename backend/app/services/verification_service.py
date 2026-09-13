@@ -60,7 +60,9 @@ def submit_verification(
         records = state_repo.get_skill_evidence(learner_id, skill_id)
         evidence = max((r["score"] for r in records), default=0.0)
     if coursework is None:
-        coursework = state_repo.get_learner_proficiency(learner_id, skill_id)["proficiency"]
+        coursework = state_repo.get_learner_proficiency(learner_id, skill_id)[
+            "proficiency"
+        ]
 
     signals = {
         "assessment": min(1.0, max(0.0, assessment)),
@@ -71,7 +73,10 @@ def submit_verification(
     verified = fuse_verified_proficiency(signals)
     claimed = float(session.get("claimed_proficiency", 0.0))
     delta = abs(claimed - verified)
-    confidence = round(min(1.0, 0.5 + len(state_repo.get_skill_evidence(learner_id, skill_id)) * 0.1), 4)
+    confidence = round(
+        min(1.0, 0.5 + len(state_repo.get_skill_evidence(learner_id, skill_id)) * 0.1),
+        4,
+    )
     discrepancy = delta >= DISCREPANCY_THRESHOLD
 
     result = {

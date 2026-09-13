@@ -1,8 +1,8 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from contextlib import asynccontextmanager
 from app.api import (
     assessments,
     auth,
@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("EXASOL_ENABLED=false; using in-memory learning state only")
     yield
+
 
 from fastapi.middleware.cors import CORSMiddleware
 

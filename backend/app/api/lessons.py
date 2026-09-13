@@ -131,9 +131,7 @@ def save_lesson_messages(
         msgs.append({"role": msg.role, "content": content, "created_at": now})
 
     if payload.replace:
-        cleaned = state_repo.replace_lesson_messages(
-            learner.learner_id, node_id, msgs
-        )
+        cleaned = state_repo.replace_lesson_messages(learner.learner_id, node_id, msgs)
     else:
         conv_id = state_repo.lesson_conversation_id(learner.learner_id, node_id)
         existing = list(state_repo.get_conversation(conv_id))

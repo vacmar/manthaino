@@ -279,9 +279,7 @@ def _generate_path_from_ai_stages(
     }
 
 
-def _generate_path_rules_fallback(
-    learner_id: str, role_id: str
-) -> dict[str, Any]:
+def _generate_path_rules_fallback(learner_id: str, role_id: str) -> dict[str, Any]:
     """Legacy catalog ranking — only used if AI service is unreachable."""
     _sync_learner_profile(learner_id, role_id)
 
@@ -351,7 +349,9 @@ def _generate_path_rules_fallback(
     }
 
 
-def generate_path_for_learner(learner_id: str, target_role_id: str | None = None) -> dict[str, Any]:
+def generate_path_for_learner(
+    learner_id: str, target_role_id: str | None = None
+) -> dict[str, Any]:
     """Create the first active learning path for a learner via the AI service."""
     existing = state_repo.get_active_path(learner_id)
     if existing:

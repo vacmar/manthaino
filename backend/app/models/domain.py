@@ -21,6 +21,7 @@ class Account(BaseModel):
     updated_at: str
     is_active: bool = True
 
+
 class Learner(BaseModel):
     learner_id: str
     account_id: str
@@ -42,6 +43,7 @@ class Learner(BaseModel):
     onboarding_completed_at: str | None = None
     created_at: str
     updated_at: str
+
 
 class Skill(BaseModel):
     skill_id: str

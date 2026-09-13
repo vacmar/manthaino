@@ -88,7 +88,9 @@ export default function ChatPage() {
                   newMsgs[newMsgs.length - 1].structured = metadata;
                   return newMsgs;
                 });
-              } catch (e) {}
+              } catch {
+                /* ignore malformed metadata frames */
+              }
             }
           }
         }

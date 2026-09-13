@@ -1,14 +1,13 @@
 import uuid
-from datetime import datetime, UTC
-from typing import Optional
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Response, Request, Depends
-from pydantic import BaseModel, EmailStr
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from passlib.context import CryptContext
+from pydantic import BaseModel, EmailStr
 
+from app.core.cache import get_redis_client
 from app.models.domain import Account, Learner
 from app.repository import state_repo
-from app.core.cache import get_redis_client
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -16,37 +15,44 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SESSION_COOKIE_NAME = "session_id"
 SESSION_EXPIRY = 86400 * 7  # 7 days
 
+
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
+
 def normalize_email(email: str) -> str:
     return email.strip().lower()
+
 
 class SignupRequest(BaseModel):
     name: str
     email: EmailStr
     password: str
 
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
 
 def get_current_account_id(request: Request) -> str:
     session_id = request.cookies.get(SESSION_COOKIE_NAME)
     if not session_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    
+
     cache = get_redis_client()
     account_id = cache.get(f"session:{session_id}")
     if not account_id:
         raise HTTPException(status_code=401, detail="Session expired or invalid")
-    
+
     if isinstance(account_id, bytes):
         return account_id.decode("utf-8")
     return str(account_id)
+
 
 def get_current_account(account_id: str = Depends(get_current_account_id)) -> Account:
     account = state_repo.get_account_by_id(account_id)
@@ -54,10 +60,13 @@ def get_current_account(account_id: str = Depends(get_current_account_id)) -> Ac
         raise HTTPException(status_code=401, detail="Account not found")
     return account
 
+
 def get_current_learner(account_id: str = Depends(get_current_account_id)) -> Learner:
     learner = state_repo.get_learner_by_account(account_id)
     if not learner:
-        raise HTTPException(status_code=404, detail="Learner profile not found for account")
+        raise HTTPException(
+            status_code=404, detail="Learner profile not found for account"
+        )
     return learner
 
 
@@ -87,7 +96,9 @@ def signup(req: SignupRequest, response: Response):
         )
         state_repo.create_learner(learner)
         session_id = uuid.uuid4().hex
-        get_redis_client().setex(f"session:{session_id}", SESSION_EXPIRY, existing.account_id)
+        get_redis_client().setex(
+            f"session:{session_id}", SESSION_EXPIRY, existing.account_id
+        )
         response.set_cookie(
             key=SESSION_COOKIE_NAME,
             value=session_id,
@@ -199,7 +210,9 @@ def login(req: LoginRequest, response: Response):
         state_repo.create_learner(learner)
 
     session_id = uuid.uuid4().hex
-    get_redis_client().setex(f"session:{session_id}", SESSION_EXPIRY, account.account_id)
+    get_redis_client().setex(
+        f"session:{session_id}", SESSION_EXPIRY, account.account_id
+    )
 
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
@@ -218,22 +231,27 @@ def login(req: LoginRequest, response: Response):
         "onboarding_completed": learner.onboarding_completed,
     }
 
+
 @router.post("/logout")
 def logout(request: Request, response: Response):
     session_id = request.cookies.get(SESSION_COOKIE_NAME)
     if session_id:
         cache = get_redis_client()
         cache.delete(f"session:{session_id}")
-    
+
     response.delete_cookie(SESSION_COOKIE_NAME, path="/")
     return {"message": "Logged out successfully"}
 
+
 @router.get("/me")
-def get_me(account: Account = Depends(get_current_account), learner: Learner = Depends(get_current_learner)):
+def get_me(
+    account: Account = Depends(get_current_account),
+    learner: Learner = Depends(get_current_learner),
+):
     return {
         "account_id": account.account_id,
         "email": account.email,
         "learner_id": learner.learner_id,
         "name": learner.name,
-        "onboarding_completed": learner.onboarding_completed
+        "onboarding_completed": learner.onboarding_completed,
     }

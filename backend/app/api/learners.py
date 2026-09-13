@@ -1,28 +1,27 @@
 from datetime import UTC, datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.models.domain import Learner
 from app.api.auth import get_current_learner
+from app.models.domain import Learner
 from app.repository import state_repo
 
 router = APIRouter(prefix="/learners", tags=["Learners"])
 
 
 class LearnerPatch(BaseModel):
-    name: Optional[str] = None
-    target_role_id: Optional[str] = None
-    target_domain: Optional[str] = None
-    goals: Optional[list[str]] = None
-    experience_level: Optional[str] = None
-    prior_experience: Optional[str] = None
-    education: Optional[str] = None
-    known_skills: Optional[list[str]] = None
-    interests: Optional[list[str]] = None
-    learning_style: Optional[str] = None
-    weekly_time: Optional[int] = None
+    name: str | None = None
+    target_role_id: str | None = None
+    target_domain: str | None = None
+    goals: list[str] | None = None
+    experience_level: str | None = None
+    prior_experience: str | None = None
+    education: str | None = None
+    known_skills: list[str] | None = None
+    interests: list[str] | None = None
+    learning_style: str | None = None
+    weekly_time: int | None = None
 
 
 class LearnerSkillsPayload(BaseModel):

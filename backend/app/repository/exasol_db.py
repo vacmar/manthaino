@@ -324,7 +324,9 @@ def create_learner(learner: Learner):
                 "goals": json.dumps(learner.goals),
                 "known_skills": json.dumps(learner.known_skills),
                 "interests": json.dumps(learner.interests),
-                "self_reported_proficiency": json.dumps(learner.self_reported_proficiency),
+                "self_reported_proficiency": json.dumps(
+                    learner.self_reported_proficiency
+                ),
             },
         )
     finally:
@@ -402,7 +404,9 @@ def update_learner(learner: Learner):
                 "goals": json.dumps(learner.goals),
                 "known_skills": json.dumps(learner.known_skills),
                 "interests": json.dumps(learner.interests),
-                "self_reported_proficiency": json.dumps(learner.self_reported_proficiency),
+                "self_reported_proficiency": json.dumps(
+                    learner.self_reported_proficiency
+                ),
             },
         )
     finally:

@@ -78,9 +78,7 @@ def test_path_generate_python_first(monkeypatch):
     assert course_ids[0].startswith("ai_")
     assert out["nodes"][0]["status"] == "UNLOCKED"
     assert out["nodes"][1]["status"] == "LOCKED"
-    titles = [
-        state_repo.db["courses"][n["course_id"]]["title"] for n in out["nodes"]
-    ]
+    titles = [state_repo.db["courses"][n["course_id"]]["title"] for n in out["nodes"]]
     assert titles[0] == "Python Basics"
     assert state_repo.db["learner_profiles"]["L1"]["recommended_project_id"]
 
@@ -148,9 +146,7 @@ def test_ai_android_path_not_fastapi(monkeypatch):
 
     monkeypatch.setattr(ai_client, "request_ai_pathway", fake_ai)
     out = replanning_service.generate_path_for_learner("L_android", "role_other")
-    titles = [
-        state_repo.db["courses"][n["course_id"]]["title"] for n in out["nodes"]
-    ]
+    titles = [state_repo.db["courses"][n["course_id"]]["title"] for n in out["nodes"]]
     assert "JavaScript Fundamentals" in titles
     assert not any("Python" in t for t in titles)
     proj_id = state_repo.db["learner_profiles"]["L_android"]["recommended_project_id"]

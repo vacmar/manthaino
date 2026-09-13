@@ -70,16 +70,43 @@ const defaultFetchOpts: RequestInit = {
   }
 };
 
+/** Turn FastAPI `{"detail":"..."}` bodies into plain Error messages. */
+async function errorFromResponse(res: Response, fallback: string): Promise<Error> {
+  const text = await res.text();
+  if (!text) return new Error(fallback);
+  try {
+    const parsed = JSON.parse(text) as { detail?: unknown };
+    if (typeof parsed.detail === "string" && parsed.detail.trim()) {
+      return new Error(parsed.detail);
+    }
+    if (Array.isArray(parsed.detail)) {
+      const parts = parsed.detail
+        .map((item) => {
+          if (typeof item === "string") return item;
+          if (item && typeof item === "object" && "msg" in item) {
+            return String((item as { msg: unknown }).msg);
+          }
+          return "";
+        })
+        .filter(Boolean);
+      if (parts.length) return new Error(parts.join(". "));
+    }
+  } catch {
+    /* plain text body */
+  }
+  return new Error(text);
+}
+
 export const api = {
   // Auth
   async signup(data: any): Promise<any> {
     const res = await fetch(`${BACKEND_URL}/auth/signup`, { ...defaultFetchOpts, method: "POST", body: JSON.stringify(data) });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw await errorFromResponse(res, "Signup failed");
     return res.json();
   },
   async login(data: any): Promise<any> {
     const res = await fetch(`${BACKEND_URL}/auth/login`, { ...defaultFetchOpts, method: "POST", body: JSON.stringify(data) });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw await errorFromResponse(res, "Login failed");
     return res.json();
   },
   async logout(): Promise<any> {

@@ -7,7 +7,6 @@ from app.main import app
 from app.models.structured import PathGenerateRequest
 from app.services.path_generator import mock_generate_pathway
 
-
 client = TestClient(app)
 
 
@@ -32,7 +31,10 @@ def test_android_profile_gets_mobile_stages():
     assert not any(n.strip() in {"python basics", "sql basics"} for n in names)
     assert path.capstone is not None
     assert "fastapi" not in path.capstone.title.lower()
-    assert "react native" in path.capstone.description.lower() or "mobile" in path.capstone.title.lower()
+    assert (
+        "react native" in path.capstone.description.lower()
+        or "mobile" in path.capstone.title.lower()
+    )
 
 
 def test_arbitrary_other_role_is_not_forced_mobile():
@@ -77,7 +79,10 @@ def test_backend_profile_gets_api_stages():
     names = " ".join(s.course_name.lower() for s in path.stages)
     assert "python" in names or "fastapi" in names or "rest" in names
     assert path.capstone is not None
-    assert "fastapi" in path.capstone.description.lower() or "api" in path.capstone.title.lower()
+    assert (
+        "fastapi" in path.capstone.description.lower()
+        or "api" in path.capstone.title.lower()
+    )
 
 
 def test_data_profile_differs_from_mobile():
@@ -95,7 +100,9 @@ def test_data_profile_differs_from_mobile():
             target_role_id="role_de",
         )
     )
-    assert [s.course_name for s in mobile.stages] != [s.course_name for s in data.stages]
+    assert [s.course_name for s in mobile.stages] != [
+        s.course_name for s in data.stages
+    ]
 
 
 @pytest.mark.asyncio

@@ -23,8 +23,14 @@ export default function LoginPage() {
       } else {
         router.push("/onboarding");
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to login");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message === "Invalid credentials"
+            ? "Wrong email or password."
+            : err.message
+          : "Failed to login";
+      setError(message);
     } finally {
       setLoading(false);
     }
