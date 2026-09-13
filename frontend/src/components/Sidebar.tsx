@@ -31,10 +31,10 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-64 border-r border-border bg-card flex flex-col hidden md:flex">
+    <aside className="w-64 border-r border-white/5 bg-background flex flex-col hidden md:flex">
       <div className="p-6">
         <h1 className="text-2xl font-heading font-bold text-primary flex items-center gap-2">
-          <span className="bg-primary text-primary-foreground p-1.5 rounded-lg">
+          <span className="bg-teal-700 text-white p-1.5 rounded-lg">
             m
           </span>
           manthaino

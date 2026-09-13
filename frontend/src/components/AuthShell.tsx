@@ -76,9 +76,15 @@ export function AuthShell({ children, mode }: Props) {
           </p>
         </section>
 
-        {/* Form plane */}
+        {/* Form plane — glass so page atmosphere shows through (no solid “other color” slab) */}
         <section className="flex flex-1 items-center justify-center px-6 pb-12 lg:px-10 lg:pb-0">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#14101c]/85 p-8 shadow-2xl shadow-black/40 backdrop-blur-md">
+          <div
+            className="w-full max-w-md rounded-2xl border border-white/[0.12] p-8 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.55)] backdrop-blur-[18px]"
+            style={{
+              background:
+                "linear-gradient(155deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 45%, rgba(10,7,16,0.25) 100%)",
+            }}
+          >
             {children}
             <p className="mt-6 text-center text-sm text-zinc-500">
               {mode === "login" ? (
@@ -105,6 +111,6 @@ export function AuthShell({ children, mode }: Props) {
 }
 
 export const authFieldClass =
-  "w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-3 text-zinc-100 placeholder:text-zinc-600 outline-none transition focus:border-teal-600/60 focus:ring-1 focus:ring-teal-600/40";
+  "w-full rounded-xl border border-white/15 bg-white/[0.04] px-3.5 py-3 text-zinc-100 placeholder:text-zinc-600 outline-none transition focus:border-teal-500/50 focus:bg-white/[0.06] focus:ring-1 focus:ring-teal-600/30";
 
 export const authLabelClass = "mb-2 block text-sm font-medium text-zinc-300";
