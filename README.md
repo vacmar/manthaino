@@ -1,203 +1,337 @@
 # manthaino
 
-Adaptive AI learning platform: verify what a learner knows, generate a dependency-aware path toward a target role, and teach interactively with an AI tutor — with progression owned by the backend, not the model.
+**Adaptive AI learning on Exasol Personal (Local)** — onboard any career role, generate an AI learning path, teach node-by-node with a live tutor. The **backend** owns unlocks and mastery; the LLM only teaches.
 
-This monorepo contains the **frontend**, **backend**, **AI service**, **Exasol** foundation, and product/docs specs.
-
----
-
-## What the product does
-
-1. **Auth** — Sign up / log in (session cookies). Learner profile stored in Exasol when enabled.
-2. **Onboarding (7 steps)** — Name, target role (catalog or free-text Other), domain, experience, known skills, interests, learning style + weekly time.
-3. **AI path generation** — Backend calls the AI service with the full profile. The model (or a profile-aware fallback) returns ordered stages + a capstone project. Backend materializes path nodes: **first unlocked**, rest **locked**.
-4. **Dashboard / My Path** — Visual pathway; nodes unlock **one at a time** after completion.
-5. **Interactive lesson** — Opening a node starts a ChatGPT-style AI lesson chat scoped to **that node**. Doubts about later topics are deferred to upcoming nodes. Practice notes + Complete node unlock the next step.
-6. **Projects** — Capstone recommended from the AI path (role-aligned, not a hardcoded FastAPI project for everyone).
-7. **Workspace / Progress / Assessments** — Additional learning surfaces (see `docs/`).
-
-**Authority rule:** The LLM teaches and suggests; it does **not** unlock nodes or invent mastery. Unlock / complete are backend state-machine operations.
+**Devjam deployment:** Exasol Personal → **Local** (`exakit` on your machine + Docker Compose for the app).
 
 ---
 
-## Repository layout
+## Table of contents
 
-```
-mathaino/
-├── frontend/          # Next.js App Router (UI)
-├── backend/           # FastAPI (auth, paths, nodes, projects, onboarding)
-├── ai-service/        # LangGraph + Hugging Face / OpenRouter / Groq / mock
-├── docs/              # Architecture, API, deployment, ADRs
-├── spec/              # Phase checklist and research notes
-├── docker-compose.yml # redis + backend + ai-service + frontend
-└── .env.example       # LLM provider secrets template (copy to .env)
-```
-
-| Service | Port | Purpose |
-|---------|------|---------|
-| Frontend | `3000` | Learner UI |
-| Backend | `8000` | Authoritative state API |
-| AI service | `8001` | Path generation + tutor / lesson chat |
-| Redis | `6379` | Sessions / ephemeral cache |
-| Exasol Personal | `8563` | Durable accounts (host, not Docker on Apple Silicon) |
+- [Project overview](#project-overview)
+- [Setup instructions](#setup-instructions)
+- [Usage instructions](#usage-instructions)
+- [Stop / restart / rebuild](#stop--restart--rebuild)
+- [Troubleshooting](#troubleshooting)
+- [More documentation](#more-documentation)
 
 ---
 
-## Architecture (how pieces talk)
+## Project overview
+
+manthaino is an adaptive learning platform built for **Exasol Devjam**. A learner picks any target role (catalog or free-text **Other**), completes a short onboarding profile, and receives a **personalized, dependency-aware path**. Each unlocked node opens a **focus lesson** (ChatGPT-style tutor + rich notes). When the tutor judges mastery, the learner confirms — the **backend** unlocks the next node and updates Progress. The LLM cannot invent unlocks or scores.
+
+### What it does
+
+| Step | Behavior |
+|------|----------|
+| Auth | Sign up / log in (HTTP-only cookies). Accounts & learners stored in **Exasol Personal**. |
+| Onboarding | 7 answers: name, role, domain, experience, skills, interests, learning style + weekly time. |
+| AI path | Backend calls AI `POST /path/generate` → stages + capstone → first node **unlocked**, rest **locked**. |
+| Learn | Focus UI (sidebar hidden): lesson chat scoped to the current node + rich notes. |
+| Mastery | AI-gated confirm → sequential unlock; Progress / My Path update. |
+| Projects | Capstone recommended from the AI path (role-aligned). |
+
+### Stack
+
+| Layer | Technology | Port |
+|-------|------------|------|
+| Frontend | Next.js 16, TypeScript, Tailwind | `3000` |
+| Backend | FastAPI (auth, paths, nodes, lessons, projects) | `8000` |
+| AI service | LangChain + Hugging Face Inference | `8001` |
+| Cache | Redis (sessions, path/lesson cache) | `6379` |
+| Data platform | **Exasol Personal** (Local) | `8563` |
+
+### Architecture
 
 ```text
-Browser
-  │
-  ├─► Backend :8000     auth, onboarding, paths, nodes, projects
-  │       │
-  │       └─► AI service :8001   POST /path/generate  (onboarding)
-  │
-  └─► AI service :8001   POST /chat/lesson  (interactive lesson)
-              │
-              └─► Hugging Face Inference (or mock / Groq / OpenRouter)
+Browser :3000
+  ├─► Backend :8000 ──► Exasol Personal :8563 (host)
+  │         ├─────────► Redis :6379
+  │         └─────────► AI :8001   (path generate)
+  └─► AI :8001                     (lesson chat → Hugging Face)
 ```
 
-- **Paths / unlocks / completion** live in the backend (in-memory `mock_db` for learning state in local MVP; accounts in Exasol when `EXASOL_ENABLED=true`).
-- After a backend container restart, learning paths in memory are cleared. Use **Dashboard** (auto `POST /paths/me/ensure`) or **Restore my path** on the lesson page — no new user required.
-- Secrets stay in `.env` (gitignored). Never commit API keys.
+### Repository layout
 
-More detail: [docs/architecture.md](./docs/architecture.md), [docs/product-flow.md](./docs/product-flow.md), [docs/api.md](./docs/api.md).
+```text
+mathaino/                 ← run all docker compose commands from here
+├── frontend/
+├── backend/
+├── ai-service/
+├── docs/
+├── docker-compose.yml
+├── .env.example
+└── README.md
+```
+
+### Known limits
+
+- Multi-track “Duolingo” role switcher: designed, not fully shipped in this window.
+- Sandboxed code Run / full auto project eval: not in this cut.
+- Paths are Redis-cached for fast restore; Exasol holds accounts (+ lesson sessions when connected).
 
 ---
 
-## Quick start (local)
+## Setup instructions
 
-### 1. Exasol (macOS)
+Follow **A → G in order**. Do not skip Exasol on macOS.
 
-Do **not** run `exasol/docker-db` on Apple Silicon. Use Exasol Personal:
+### A. Prerequisites
+
+| Tool | Why |
+|------|-----|
+| **Git** | Clone the repo |
+| **Docker Desktop** | Redis, backend, AI service, frontend |
+| **Exasol Personal / Exakit** | Mandatory data platform (`exakit start`) |
+| **Hugging Face token** | Live AI (or set `LLM_PROVIDER=mock`) |
+
+**Ports that must be free:** `3000`, `8000`, `8001`, `6379`, `8563`.
+
+**macOS:** Do **not** use `exasol/docker-db` on Apple Silicon — use **Exasol Personal** only.
+
+```bash
+docker version
+docker compose version
+```
+
+### B. Clone the repo (path matters)
+
+```bash
+git clone https://github.com/vacmar/mathaino.git
+cd mathaino
+```
+
+Confirm you are in the folder that contains `docker-compose.yml`:
+
+```bash
+pwd
+ls
+# expect: docker-compose.yml  frontend  backend  ai-service  docs  README.md  .env.example
+```
+
+Example absolute path:
+
+```text
+/Users/vaaheesan/manthaino/mathaino
+```
+
+**Always run `docker compose` from this directory.**
+
+### C. Start Exasol Personal (Local)
+
+Exasol runs on the **host**, not in the default Compose stack.
 
 ```bash
 exakit start
-# Password typically via file, e.g. ~/.exasol-starter-kit/credentials/personal_sys_password
 ```
 
-See [docs/adr/0001-exasol-personal-on-macos.md](./docs/adr/0001-exasol-personal-on-macos.md).
-
-### 2. Environment
+Confirm port **8563**:
 
 ```bash
-cd mathaino
+lsof -iTCP:8563 -sTCP:LISTEN || true
+nc -vz 127.0.0.1 8563
+```
+
+Background: [docs/adr/0001-exasol-personal-on-macos.md](./docs/adr/0001-exasol-personal-on-macos.md).
+
+### D. Create `.env`
+
+```bash
 cp .env.example .env
-# Set HUGGINGFACE_API_KEY (or switch LLM_PROVIDER=mock|groq|openrouter)
+open -e .env    # or: nano .env
 ```
 
-Compose defaults to Hugging Face when configured:
+**Live AI demo** — put your key in `.env`:
 
-| Variable | Meaning |
-|----------|---------|
-| `LLM_PROVIDER` | `huggingface` \| `mock` \| `groq` \| `openrouter` |
-| `HUGGINGFACE_API_KEY` | HF token with Inference Providers access |
-| `HUGGINGFACE_MODEL` | Default: `meta-llama/Llama-3.1-8B-Instruct` |
+```env
+LLM_PROVIDER=huggingface
+HUGGINGFACE_API_KEY=hf_your_token_here
+HUGGINGFACE_MODEL=meta-llama/Llama-3.1-8B-Instruct
 
-### 3. Run the stack
+EXASOL_ENABLED=true
+EXASOL_DSN=host.docker.internal:8563
+EXASOL_USER=sys
+EXASOL_SCHEMA=MANTHAINO
+```
+
+**No HF key** (mock AI):
+
+```env
+LLM_PROVIDER=mock
+EXASOL_ENABLED=true
+EXASOL_DSN=host.docker.internal:8563
+EXASOL_USER=sys
+EXASOL_SCHEMA=MANTHAINO
+```
+
+| Variable | Required | Meaning |
+|----------|----------|---------|
+| `LLM_PROVIDER` | Yes | `huggingface` or `mock` |
+| `HUGGINGFACE_API_KEY` | If using HF | Inference token |
+| `HUGGINGFACE_MODEL` | Recommended | Default Llama 3.1 8B Instruct |
+| `EXASOL_ENABLED` | Yes | `true` for Local Personal |
+| `EXASOL_DSN` | Yes | Docker → host: `host.docker.internal:8563` |
+| `EXASOL_USER` | Yes | Usually `sys` |
+| `EXASOL_SCHEMA` | Yes | `MANTHAINO` |
+
+Never commit `.env` (gitignored).
+
+### E. Confirm the Exasol password file
+
+Compose mounts:
+
+```text
+$HOME/.exasol-starter-kit/credentials/personal_sys_password
+  →  /run/secrets/exasol_sys_password   (inside backend container)
+```
 
 ```bash
-docker compose up --build
+ls -la "$HOME/.exasol-starter-kit/credentials/personal_sys_password"
 ```
 
-- App: http://localhost:3000  
-- Backend health: http://localhost:8000/health  
-- AI health: http://localhost:8001/health (`provider` should match your LLM setting)
+If missing: symlink your real Exakit password file to that path, edit the `backend.volumes` line in `docker-compose.yml`, or set `EXASOL_PASSWORD=...` in `.env` (do not commit).
 
-Backend-only tests without Exasol:
+### F. Start the stack with Docker
 
 ```bash
-cd backend
-EXASOL_ENABLED=false pytest -q
+pwd
+# must show .../mathaino (folder with docker-compose.yml)
+
+docker compose down
+docker compose up --build -d
 ```
 
-AI path-generation tests:
+| Service | Role | URL |
+|---------|------|-----|
+| `redis` | Sessions + path/lesson cache | `localhost:6379` |
+| `ai-service` | Path generate + lesson tutor | http://localhost:8001 |
+| `backend` | API + Exasol + Redis | http://localhost:8000 |
+| `frontend` | Learner UI | http://localhost:3000 |
 
 ```bash
-cd ai-service
-LLM_PROVIDER=mock pytest tests/test_path_generate.py -q
+docker compose ps
+docker compose logs -f --tail=100
+# Ctrl+C stops following logs only
+```
+
+First build may take several minutes.
+
+### G. Verify setup
+
+```bash
+docker compose ps
+
+curl -s http://localhost:8000/health
+# expect: "status":"ok", "exasol_connected":true
+
+curl -s http://localhost:8001/health
+# expect: "provider":"huggingface" (or "mock")
+
+curl -sf -o /dev/null -w "frontend_http=%{http_code}\n" http://localhost:3000
+# expect: frontend_http=200
+```
+
+Open: **http://localhost:3000**  
+Use **`localhost`**, not `127.0.0.1` (auth cookies).
+
+### Quick copy-paste (after tools are installed)
+
+```bash
+git clone https://github.com/vacmar/mathaino.git
+cd mathaino
+
+exakit start
+ls -la "$HOME/.exasol-starter-kit/credentials/personal_sys_password"
+
+cp .env.example .env
+# edit .env → HUGGINGFACE_API_KEY=...
+
+docker compose up --build -d
+
+curl -s http://localhost:8000/health
+curl -s http://localhost:8001/health
+open http://localhost:3000
 ```
 
 ---
 
-## Learner journey (happy path)
+## Usage instructions
 
-1. Open http://localhost:3000 → **Sign up**.
-2. Complete **onboarding** (Other works for any role title, e.g. Data Scientist / Software Developer).
-3. Click **Generate My Path** — AI returns tailored stages + capstone.
-4. On **My Path**, only the first node is unlocked.
-5. Open the node → **AI Lesson Chat** teaches that topic; ask doubts; upcoming topics are deferred.
-6. Add practice notes → **Complete node** → next node unlocks.
-7. **Projects** shows the AI-recommended capstone for that path.
+Once setup verification passes:
 
----
+1. Open **http://localhost:3000**.
+2. Click **Sign up** (email + password). Prefer a fresh account for demos.
+3. Complete **onboarding** (7 steps). Use role **Other** for any custom title (e.g. Android Developer, Data Scientist).
+4. Wait for **AI path generation**, then land on the **Dashboard**.
+5. Open the **active** (unlocked) node → focus lesson:
+   - Chat with the AI tutor (scoped to this node).
+   - Take **rich notes** (title, bold, lists, tables) and Save.
+6. When the tutor marks the node ready, click **Confirm mastery**.
+7. Confirm the **next node unlocks**; check **My Path**, **Progress**, and **Projects** (AI capstone).
 
-## Key APIs
+**Tips**
 
-| Endpoint | Service | Role |
-|----------|---------|------|
-| `POST /onboarding/` | Backend | Save profile; generate AI path |
-| `GET /paths/me/active` | Backend | Current path + node titles |
-| `POST /paths/me/ensure` | Backend | Recreate path if wiped after restart |
-| `POST /nodes/{id}/complete` | Backend | Mark node complete; unlock next |
-| `GET /projects/me/recommended` | Backend | Capstone for this learner |
-| `POST /path/generate` | AI | Structured pathway + capstone from profile |
-| `POST /chat/lesson` | AI | Conversational tutor scoped to current node |
-| `POST /chat/tutor` | AI | General tutor persona (tools / orchestrator) |
+- Only one node is unlocked at a time until mastery is confirmed.
+- After a backend rebuild, reload Dashboard (Redis usually restores the path) or use **Restore my path** on the lesson screen.
+- Wrong password shows a plain message (not raw JSON).
+
+**Demo video script (≤3 minutes):** [docs/demo-script.md](./docs/demo-script.md).
 
 ---
 
-## Implementation status (high level)
+## Stop / restart / rebuild
 
-| Area | Status |
-|------|--------|
-| Auth + Exasol accounts | Working locally with Personal Exasol |
-| Onboarding UX (7 steps) | Done |
-| AI path generation (HF) | Done (mock fallback if LLM fails) |
-| Sequence unlocks | Done |
-| Interactive lesson chat | Done (MVP) |
-| AI-gated “Complete node” | Planned |
-| Persist chat + notes per node | Planned |
-| Capstone / projects | Working; AI-recommended project |
-| Full Exasol path persistence | Partial (paths still primarily in-memory) |
-| CI / docs | Present under `.github/` and `docs/` |
+```bash
+docker compose stop          # pause
+docker compose start         # resume
+docker compose down          # stop containers
+docker compose up --build -d # rebuild after code/.env changes
 
-Phase checklist: [spec/PHASES.md](./spec/PHASES.md). Deep notes: [docs/deep-research-report.md](./docs/deep-research-report.md).
+# wipe Redis volumes (clears cached paths/sessions)
+docker compose down -v
+docker compose up --build -d
+```
+
+Exasol Personal data stays on the host until you reset it with Exakit.
 
 ---
 
-## Exasol Devjam alignment
+## Troubleshooting
 
-Built for **Exasol Devjam** submission constraints:
+| Symptom | Fix |
+|---------|-----|
+| `no configuration file provided` | `cd` to the directory that contains `docker-compose.yml` |
+| `exasol_connected: false` | `exakit start` → `nc -vz 127.0.0.1 8563` → check password file → `docker compose logs backend` |
+| Password file missing | Fix path under `$HOME/.exasol-starter-kit/credentials/` or set `EXASOL_PASSWORD` in `.env` |
+| Login / session issues | Use only `http://localhost:3000` |
+| Dashboard loading forever | Check AI health + HF key; first path gen calls the LLM |
+| Port in use | Free 3000 / 8000 / 8001 / 6379 / 8563 |
+| Path gone after rebuild | Reload Dashboard or **Restore my path** |
 
-- **Data platform:** Exasol Personal (local) — not docker-db on Apple Silicon; see ADR above.
-- **Any stack / LLM:** Next.js + FastAPI + Hugging Face Inference for path + lesson tutoring.
-- **Docs:** This README + `docs/` cover overview, setup, architecture, and demo flow.
-- **UX:** Onboarding → AI path → interactive lesson chat → confirm mastery → progress unlock.
-
-Judging-oriented strengths: personalized AI curricula on Exasol-backed accounts, deterministic unlocks, and interactive tutoring scoped per node.
-
-- [Architecture](./docs/architecture.md)
-- [Product flow](./docs/product-flow.md)
-- [Data model](./docs/data-model.md)
-- [API](./docs/api.md)
-- [Deployment](./docs/deployment.md)
-- [Security](./docs/security.md)
-- [Demo script](./docs/demo-script.md)
-- [AI service README](./ai-service/README.md)
-- [Backend / frontend](./backend/) · [frontend](./frontend/)
+```bash
+docker compose logs backend --tail=200
+docker compose logs ai-service --tail=200
+```
 
 ---
 
-## Development notes
+## More documentation
 
-- **Frontend** talks to backend with `credentials: "include"` (cookies). Prefer `http://localhost:3000` consistently (not mixing `127.0.0.1`).
-- **Docker** backend uses `AI_SERVICE_URL=http://ai-service:8001` and Exasol via `host.docker.internal:8563`.
-- **Do not commit** `.env` / API keys. Rotate any key that was pasted into chat or logs.
-- Branch for current AI path + lesson work: `feat/ai-path-generation-and-lesson-tutor`.
+| Doc | Path |
+|-----|------|
+| Extra run detail | [docs/RUN_GUIDE.md](./docs/RUN_GUIDE.md) |
+| Demo script | [docs/demo-script.md](./docs/demo-script.md) |
+| Pitch deck content | [docs/PITCH_DECK_CONTENT.md](./docs/PITCH_DECK_CONTENT.md) |
+| Architecture / API | [docs/](./docs/) |
+| Phases | [spec/PHASES.md](./spec/PHASES.md) |
 
----
+Optional local tests:
 
-## License / contributing
+```bash
+cd backend && EXASOL_ENABLED=false pytest -q
+cd ../ai-service && LLM_PROVIDER=mock pytest -q
+cd ../frontend && npm ci && npm run lint && npx tsc --noEmit && npm run build
+```
 
-See service-level READMEs and `.github/` for CI. Product direction and phase gates live in `spec/`.
+**Submission form:** Exasol Personal — **Local**.
