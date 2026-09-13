@@ -9,6 +9,7 @@ from app.api import (
     conversations,
     goals,
     learners,
+    lessons,
     nodes,
     onboarding,
     paths,
@@ -49,6 +50,7 @@ app.include_router(learners.router)
 app.include_router(assessments.router)
 app.include_router(paths.router)
 app.include_router(nodes.router)
+app.include_router(lessons.router)
 app.include_router(conversations.router)
 app.include_router(projects.router)
 app.include_router(onboarding.router)

@@ -107,6 +107,44 @@ export const api = {
     return res.json();
   },
 
+  async getLessonSession(nodeId: string): Promise<{
+    node_id: string;
+    conversation_id: string;
+    messages: Array<{ role: string; content: string }>;
+    practice_notes: string;
+  }> {
+    const res = await fetch(`${BACKEND_URL}/lessons/me/${nodeId}/session`, {
+      ...defaultFetchOpts,
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+    return res.json();
+  },
+
+  async saveLessonMessages(
+    nodeId: string,
+    messages: Array<{ role: string; content: string }>,
+    replace = true
+  ): Promise<any> {
+    const res = await fetch(`${BACKEND_URL}/lessons/me/${nodeId}/messages`, {
+      ...defaultFetchOpts,
+      method: "POST",
+      body: JSON.stringify({ messages, replace }),
+    });
+    if (!res.ok) throw new Error(`Failed to save lesson messages: ${res.status}`);
+    return res.json();
+  },
+
+  async saveLessonNotes(nodeId: string, practiceNotes: string): Promise<any> {
+    const res = await fetch(`${BACKEND_URL}/lessons/me/${nodeId}/notes`, {
+      ...defaultFetchOpts,
+      method: "PUT",
+      body: JSON.stringify({ practice_notes: practiceNotes }),
+    });
+    if (!res.ok) throw new Error(`Failed to save notes: ${res.status}`);
+    return res.json();
+  },
+
   async completeLesson(learnerId: string, nodeId: string, opts?: { assessment_score?: number; practical_pass?: boolean }): Promise<any> {
     const body: CompletionPayload = {
       learner_id: learnerId,

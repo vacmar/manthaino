@@ -3,7 +3,16 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api, PathNode } from "@/lib/api";
-import { ArrowLeft, Bot, CheckCircle, Lock, Send, User, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Bot,
+  CheckCircle,
+  Lock,
+  Send,
+  User,
+  Loader2,
+  Save,
+} from "lucide-react";
 import Link from "next/link";
 
 type LessonNode = PathNode & { course_title?: string };
@@ -15,6 +24,11 @@ type ChatMsg = {
 
 const AI_URL = process.env.NEXT_PUBLIC_AI_SERVICE_URL || "http://localhost:8001";
 
+const PLACEHOLDER_MSGS = new Set([
+  "Starting your AI lesson…",
+  "Preparing your AI lesson…",
+]);
+
 export default function LessonPage() {
   const params = useParams();
   const router = useRouter();
@@ -23,6 +37,8 @@ export default function LessonPage() {
   const [pathMissing, setPathMissing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [notesSavedAt, setNotesSavedAt] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [node, setNode] = useState<LessonNode | null>(null);
   const [pathNodes, setPathNodes] = useState<LessonNode[]>([]);
@@ -32,12 +48,35 @@ export default function LessonPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
   const [tutorBootstrapped, setTutorBootstrapped] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function persistMessages(next: ChatMsg[]) {
+    const clean = next.filter(
+      (m) => m.content?.trim() && !PLACEHOLDER_MSGS.has(m.content.trim())
+    );
+    if (clean.length === 0) return;
+    try {
+      await api.saveLessonMessages(nodeId, clean, true);
+    } catch (err) {
+      console.error("Failed to persist lesson chat", err);
+    }
+  }
+
+  function schedulePersist(next: ChatMsg[]) {
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => {
+      void persistMessages(next);
+    }, 300);
+  }
 
   async function loadPath(preferEnsure = false) {
     setLoading(true);
     setError("");
+    setSessionReady(false);
+    setTutorBootstrapped(false);
     try {
       const me = await api.getMe();
       setLearnerId(me.learner_id);
@@ -51,8 +90,26 @@ export default function LessonPage() {
       if (found) {
         setNode(found);
         setPathMissing(false);
+        try {
+          const session = await api.getLessonSession(nodeId);
+          const restored = (session.messages || [])
+            .filter((m) => m.role === "user" || m.role === "assistant")
+            .map((m) => ({
+              role: m.role as "user" | "assistant",
+              content: m.content,
+            }))
+            .filter((m) => m.content?.trim() && !PLACEHOLDER_MSGS.has(m.content.trim()));
+          setMessages(restored);
+          setPracticeNotes(session.practice_notes || "");
+          if (restored.length > 0) {
+            setTutorBootstrapped(true);
+          }
+        } catch (err) {
+          console.error(err);
+          setMessages([]);
+        }
+        setSessionReady(true);
       } else if (nodes.length > 0) {
-        // Old node id after path regenerate — send user to the first unlocked node
         const next =
           nodes.find((n) => n.status === "UNLOCKED" || n.status === "IN_PROGRESS") ||
           nodes[0];
@@ -73,6 +130,9 @@ export default function LessonPage() {
 
   useEffect(() => {
     void loadPath(false);
+    return () => {
+      if (persistTimer.current) clearTimeout(persistTimer.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeId]);
 
@@ -98,8 +158,12 @@ export default function LessonPage() {
   }, [pathNodes, nodeId, title, goal]);
 
   useEffect(() => {
-    if (!node || !learnerId || tutorBootstrapped) return;
+    if (!sessionReady || !node || !learnerId || tutorBootstrapped) return;
     if (node.status === "LOCKED") return;
+    if (messages.length > 0) {
+      setTutorBootstrapped(true);
+      return;
+    }
 
     const opener =
       `Start the interactive lesson for “${lessonContext.current_node_title}”. ` +
@@ -110,7 +174,7 @@ export default function LessonPage() {
     setMessages([{ role: "assistant", content: "Starting your AI lesson…" }]);
     void sendLessonChat(opener, [], true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [node, learnerId, tutorBootstrapped, lessonContext.current_node_title]);
+  }, [sessionReady, node, learnerId, tutorBootstrapped, lessonContext.current_node_title]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -132,7 +196,9 @@ export default function LessonPage() {
           message: userMessage,
           learner_id: learnerId,
           node_id: nodeId,
-          history: history.map((m) => ({ role: m.role, content: m.content })),
+          history: history
+            .filter((m) => !PLACEHOLDER_MSGS.has(m.content))
+            .map((m) => ({ role: m.role, content: m.content })),
           lesson_context: lessonContext,
         }),
       });
@@ -144,25 +210,33 @@ export default function LessonPage() {
         "What would you like to go over in this lesson?";
 
       setMessages((prev) => {
+        let next: ChatMsg[];
         if (
           replaceLastAssistant &&
           prev.length > 0 &&
           prev[prev.length - 1].role === "assistant"
         ) {
-          return [...prev.slice(0, -1), { role: "assistant", content }];
+          next = [...prev.slice(0, -1), { role: "assistant", content }];
+        } else {
+          next = [...prev, { role: "assistant", content }];
         }
-        return [...prev, { role: "assistant", content }];
+        schedulePersist(next);
+        return next;
       });
     } catch (err) {
       console.error(err);
-      setMessages((prev) => [
-        ...prev.filter((m) => m.content !== "Starting your AI lesson…"),
-        {
-          role: "assistant",
-          content:
-            "I couldn't reach the AI tutor just now. Try again in a moment — or type your question once more.",
-        },
-      ]);
+      setMessages((prev) => {
+        const next = [
+          ...prev.filter((m) => !PLACEHOLDER_MSGS.has(m.content)),
+          {
+            role: "assistant" as const,
+            content:
+              "I couldn't reach the AI tutor just now. Try again in a moment — or type your question once more.",
+          },
+        ];
+        schedulePersist(next);
+        return next;
+      });
     } finally {
       setChatLoading(false);
     }
@@ -175,7 +249,22 @@ export default function LessonPage() {
     setInput("");
     const nextHistory = [...messages, { role: "user" as const, content: userMessage }];
     setMessages(nextHistory);
+    schedulePersist(nextHistory);
     await sendLessonChat(userMessage, nextHistory);
+  };
+
+  const handleSaveNotes = async () => {
+    setSavingNotes(true);
+    setError("");
+    try {
+      await api.saveLessonNotes(nodeId, practiceNotes);
+      setNotesSavedAt(new Date().toLocaleTimeString());
+    } catch (err) {
+      console.error(err);
+      setError("Could not save notes. Try again.");
+    } finally {
+      setSavingNotes(false);
+    }
   };
 
   const handleRestorePath = async () => {
@@ -195,6 +284,8 @@ export default function LessonPage() {
     setCompleting(true);
     setError("");
     try {
+      await api.saveLessonNotes(nodeId, practiceNotes);
+      await persistMessages(messages);
       const me = await api.getMe();
       await api.completeLesson(me.learner_id, nodeId);
       router.push("/dashboard");
@@ -219,9 +310,8 @@ export default function LessonPage() {
         <div className="bg-card/40 border border-border/50 rounded-2xl p-8 space-y-4">
           <h1 className="text-2xl font-bold text-white">Lesson unavailable</h1>
           <p className="text-zinc-400 text-sm leading-relaxed">
-            Your learning path was cleared when the backend restarted (paths are in memory for
-            now). You do <strong className="text-zinc-200">not</strong> need a new account —
-            restore the path for this user and open the first unlocked node.
+            Your learning path was cleared when the backend restarted. You do not need a new
+            account — restore the path and reopen the node.
           </p>
           <button
             onClick={handleRestorePath}
@@ -258,7 +348,7 @@ export default function LessonPage() {
               </span>
               <h1 className="text-xl font-bold text-white">{title}</h1>
               <p className="text-xs text-zinc-500">
-                Ask doubts freely — upcoming topics stay for later nodes.
+                Chat is saved for this node — leave and come back anytime.
               </p>
             </div>
           </div>
@@ -293,12 +383,7 @@ export default function LessonPage() {
                           : "bg-black/30 border border-white/10 text-zinc-300 rounded-tl-none"
                       }`}
                     >
-                      {msg.content ||
-                        (chatLoading && idx === messages.length - 1 ? (
-                          <Loader2 className="w-4 h-4 animate-spin opacity-50" />
-                        ) : (
-                          ""
-                        ))}
+                      {msg.content}
                     </div>
                   </div>
                 ))}
@@ -339,10 +424,10 @@ export default function LessonPage() {
 
         <div className="bg-card/40 backdrop-blur-sm border border-border/50 rounded-2xl p-6 space-y-5 h-fit">
           <div>
-            <h2 className="text-lg font-semibold text-white mb-2">Practice & complete</h2>
+            <h2 className="text-lg font-semibold text-white mb-2">Practice notes</h2>
             <p className="text-zinc-400 text-sm leading-relaxed">
-              Chat until the idea clicks, then jot a short note. Completing unlocks the next
-              node.
+              Capture what you learned. Use <strong className="text-zinc-200">Save</strong> so
+              notes survive when you leave this page.
             </p>
           </div>
 
@@ -350,15 +435,35 @@ export default function LessonPage() {
             <div className="p-3 rounded-xl bg-red-500/10 text-red-400 text-sm">{error}</div>
           )}
 
-          <div className="bg-black/30 rounded-xl p-4 border border-white/5">
-            <h3 className="text-white font-medium mb-2 text-sm">Practice notes</h3>
+          <div className="bg-black/30 rounded-xl p-4 border border-white/5 space-y-3">
             <textarea
-              className="w-full min-h-[140px] font-mono text-sm bg-black/50 p-3 rounded-lg text-zinc-300 border border-white/10"
-              placeholder="// What did you learn or try?"
+              className="w-full min-h-[160px] text-sm leading-relaxed bg-black/50 p-3 rounded-lg text-zinc-200 border border-white/10 whitespace-pre-wrap"
+              placeholder={"What did you learn?\n\n• Key idea\n• Example you tried\n• Still unclear…"}
               value={practiceNotes}
-              disabled={locked || node.status === "COMPLETED"}
-              onChange={(e) => setPracticeNotes(e.target.value)}
+              disabled={locked}
+              onChange={(e) => {
+                setPracticeNotes(e.target.value);
+                setNotesSavedAt(null);
+              }}
             />
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-zinc-500">
+                {notesSavedAt ? `Saved at ${notesSavedAt}` : "Unsaved changes stay local until Save"}
+              </p>
+              <button
+                type="button"
+                onClick={handleSaveNotes}
+                disabled={savingNotes || locked}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-muted/40 text-sm text-white hover:bg-muted disabled:opacity-50"
+              >
+                {savingNotes ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                Save notes
+              </button>
+            </div>
           </div>
 
           <div className="pt-2 flex justify-between items-center gap-3">

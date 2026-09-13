@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 from app.models.domain import PathNode, LearningPath, Account, Learner
 from . import exasol_db
@@ -163,6 +164,21 @@ def save_conversation_summary(conversation_id: str, summary: str):
     if "summaries" not in db:
         db["summaries"] = {}
     db["summaries"][conversation_id] = summary
+
+
+def lesson_conversation_id(learner_id: str, node_id: str) -> str:
+    return f"lesson:{learner_id}:{node_id}"
+
+
+def get_lesson_notes(learner_id: str, node_id: str) -> str:
+    key = f"{learner_id}:{node_id}"
+    return cast(str, db.setdefault("lesson_notes", {}).get(key, "") or "")
+
+
+def save_lesson_notes(learner_id: str, node_id: str, notes: str) -> str:
+    key = f"{learner_id}:{node_id}"
+    db.setdefault("lesson_notes", {})[key] = notes
+    return notes
 
 
 # --- Assessments ---
