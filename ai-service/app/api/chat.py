@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 
 from app.models.structured import ChatRequest, ChatResponse
 from app.orchestrator.graph import orchestrator_graph
+from app.services.lesson_chat import run_lesson_chat
 
 router = APIRouter(prefix="/chat", tags=["Chat & Personas"])
 
@@ -101,6 +102,15 @@ async def stream_tutor(request: ChatRequest):
 async def chat_tutor(request: ChatRequest) -> ChatResponse:
     """Invoke the Adaptive AI Tutor persona for learning workspace dialogues."""
     return await _run_persona(request, "tutor")
+
+
+@router.post("/lesson", response_model=ChatResponse)
+async def chat_lesson(request: ChatRequest) -> ChatResponse:
+    """Interactive ChatGPT-style lesson chat scoped to the active path node."""
+    try:
+        return await run_lesson_chat(request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lesson chat failed: {e!s}")
 
 
 @router.post("/pathway-explanation", response_model=ChatResponse)

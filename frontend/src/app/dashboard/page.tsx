@@ -26,7 +26,7 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const pathData = await api.getActivePath();
+        const pathData = await api.ensureActivePath();
 
         const mappedNodes = pathData.nodes
           .map((n: any) => {

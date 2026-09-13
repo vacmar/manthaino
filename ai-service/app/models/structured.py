@@ -133,6 +133,29 @@ class ChatRequest(BaseModel):
     project_id: str | None = Field(
         default=None, description="Project ID (for project mentor)"
     )
+    history: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="Prior chat turns [{role, content}] for conversational continuity",
+    )
+    lesson_context: dict[str, Any] | None = Field(
+        default=None,
+        description="Current/upcoming node titles and goal for scoped tutoring",
+    )
+    history: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="Recent chat turns [{role, content}] for multi-turn lesson tutoring",
+    )
+    lesson_title: str | None = Field(
+        default=None, description="Human title of the active learning node"
+    )
+    upcoming_nodes: list[str] = Field(
+        default_factory=list,
+        description="Titles of later path nodes (defer questions about these)",
+    )
+    previous_nodes: list[str] = Field(
+        default_factory=list,
+        description="Titles of earlier completed/prior path nodes",
+    )
 
 
 class ChatResponse(BaseModel):

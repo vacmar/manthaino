@@ -97,6 +97,16 @@ export const api = {
     return res.json();
   },
 
+  async ensureActivePath(): Promise<LearningPath & { regenerated?: boolean }> {
+    const res = await fetch(`${BACKEND_URL}/paths/me/ensure`, {
+      ...defaultFetchOpts,
+      method: "POST",
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+    return res.json();
+  },
+
   async completeLesson(learnerId: string, nodeId: string, opts?: { assessment_score?: number; practical_pass?: boolean }): Promise<any> {
     const body: CompletionPayload = {
       learner_id: learnerId,
