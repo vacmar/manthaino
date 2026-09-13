@@ -268,6 +268,7 @@ def _generate_path_from_ai_stages(
     from app.services import unlock_service
 
     unlock_service.check_unlocks(learner_id, path_id)
+    state_repo.persist_active_path(learner_id)
 
     return {
         "path_id": path_id,

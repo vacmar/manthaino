@@ -97,6 +97,91 @@ def update_learner(learner: Learner):
             logger.warning("Exasol update_learner failed, using mock store: %s", e)
     _save_learner_mock(learner)
 
+PATH_REDIS_TTL = 60 * 60 * 24 * 30  # 30 days
+
+
+def _path_redis_key(learner_id: str) -> str:
+    return f"learner_path:{learner_id}"
+
+
+def _sync_active_path_snapshot(learner_id: str) -> None:
+    """Persist active path + nodes + courses so login survives backend restarts."""
+    path = None
+    for p in db["paths"].values():
+        if p.learner_id == learner_id and p.is_active:
+            path = p
+            break
+    if not path:
+        return
+
+    nodes = [n for n in db["nodes"].values() if n.path_id == path.path_id]
+    course_ids = {n.course_id for n in nodes}
+    courses = {
+        cid: dict(db.get("courses", {}).get(cid) or {})
+        for cid in course_ids
+        if db.get("courses", {}).get(cid)
+    }
+    profile = dict(db.setdefault("learner_profiles", {}).get(learner_id) or {})
+    payload = {
+        "path": path.model_dump(mode="json"),
+        "nodes": [n.model_dump(mode="json") for n in nodes],
+        "courses": courses,
+        "profile": profile,
+    }
+    try:
+        import json
+
+        from app.core.cache import get_redis_client
+
+        get_redis_client().set(
+            _path_redis_key(learner_id), json.dumps(payload), ex=PATH_REDIS_TTL
+        )
+    except Exception as e:
+        logger.warning("Redis path sync failed: %s", e)
+
+
+def _hydrate_path_from_redis(learner_id: str) -> bool:
+    """Restore path/nodes/courses from Redis into RAM. Returns True if restored."""
+    try:
+        import json
+
+        from app.core.cache import get_redis_client
+
+        raw = get_redis_client().get(_path_redis_key(learner_id))
+        if not raw:
+            return False
+        payload = json.loads(raw)
+    except Exception as e:
+        logger.warning("Redis path hydrate failed: %s", e)
+        return False
+
+    path_data = payload.get("path")
+    if not path_data:
+        return False
+
+    path = LearningPath(**path_data)
+    # Deactivate any stale in-memory paths for this learner
+    for existing in db["paths"].values():
+        if existing.learner_id == learner_id and existing.is_active:
+            existing.is_active = False
+    db["paths"][path.path_id] = path
+
+    for node_data in payload.get("nodes") or []:
+        node = PathNode(**node_data)
+        db["nodes"][node.node_id] = node
+
+    courses = db.setdefault("courses", {})
+    for cid, course in (payload.get("courses") or {}).items():
+        if course:
+            courses[cid] = course
+
+    if payload.get("profile"):
+        db.setdefault("learner_profiles", {})[learner_id] = dict(payload["profile"])
+
+    logger.info("Hydrated active path for learner %s from Redis", learner_id)
+    return True
+
+
 def get_node(node_id: str) -> PathNode | None:
     if node_id in db["nodes"]:
         return db["nodes"][node_id]
@@ -105,24 +190,43 @@ def get_node(node_id: str) -> PathNode | None:
 
 def update_node(node: PathNode):
     db["nodes"][node.node_id] = node
+    path = db["paths"].get(node.path_id)
+    if path and path.is_active:
+        _sync_active_path_snapshot(path.learner_id)
 
 
 def get_nodes_for_path(path_id: str) -> list[PathNode]:
     return [n for n in db["nodes"].values() if n.path_id == path_id]
 
 
-from app.models.domain import LearningPath
-
-
 def get_active_path(learner_id: str) -> LearningPath | None:
     for path in db["paths"].values():
         if path.learner_id == learner_id and path.is_active:
             return path
+    if _hydrate_path_from_redis(learner_id):
+        for path in db["paths"].values():
+            if path.learner_id == learner_id and path.is_active:
+                return path
     return None
 
 
 def save_path(path: LearningPath):
+    if path.is_active:
+        for existing in db["paths"].values():
+            if (
+                existing.learner_id == path.learner_id
+                and existing.path_id != path.path_id
+                and existing.is_active
+            ):
+                existing.is_active = False
     db["paths"][path.path_id] = path
+    if path.is_active:
+        _sync_active_path_snapshot(path.learner_id)
+
+
+def persist_active_path(learner_id: str) -> None:
+    """Public hook after path mutations (unlocks, completion, generation)."""
+    _sync_active_path_snapshot(learner_id)
 
 
 def get_path(path_id: str) -> LearningPath | None:

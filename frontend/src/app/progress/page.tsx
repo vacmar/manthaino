@@ -40,7 +40,7 @@ export default function ProgressPage() {
       try {
         const [me, path, verification] = await Promise.all([
           api.getMe(),
-          api.ensureActivePath(),
+          api.getActivePath().catch(() => api.ensureActivePath()),
           api.getVerification().catch(() => null),
         ]);
 

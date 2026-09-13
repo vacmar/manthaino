@@ -6,7 +6,7 @@ import { Play, CheckCircle2, CircleDashed, Lock } from "lucide-react";
 import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { api } from "@/lib/api";
+import { api, LearningPath } from "@/lib/api";
 
 export interface Node {
   id: string;
@@ -16,50 +16,88 @@ export interface Node {
   lockReason?: string;
 }
 
+type DashboardData = {
+  goal: string;
+  progress: number;
+  nodes: Node[];
+};
+
+const DASHBOARD_CACHE_KEY = "manthaino:dashboard_path_v1";
+
+function mapPathToDashboard(pathData: LearningPath): DashboardData {
+  const mappedNodes = pathData.nodes
+    .map((n) => {
+      let status: Node["status"] = "locked";
+      if (n.status === "COMPLETED") status = "completed";
+      if (n.status === "IN_PROGRESS" || n.status === "UNLOCKED") status = "active";
+
+      return {
+        id: n.node_id,
+        title: n.course_title || n.course_id.replace(/^c_/, "").replace(/_/g, " "),
+        status,
+        tier: n.sequence_order,
+        lockReason:
+          status === "locked"
+            ? "Complete the previous node to unlock this one."
+            : undefined,
+      } as Node;
+    })
+    .sort((a, b) => a.tier - b.tier);
+
+  const completed = mappedNodes.filter((n) => n.status === "completed").length;
+  const progress =
+    mappedNodes.length > 0 ? Math.round((completed / mappedNodes.length) * 100) : 0;
+
+  return {
+    goal: pathData.goal || "Personalized Pathway",
+    progress,
+    nodes: mappedNodes,
+  };
+}
+
+function readDashboardCache(): DashboardData | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as DashboardData;
+    if (!parsed?.nodes?.length) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeDashboardCache(data: DashboardData) {
+  try {
+    sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(data));
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function DashboardPage() {
-  const [data, setData] = useState<{
-    goal: string;
-    progress: number;
-    nodes: Node[];
-  } | null>(null);
+  const [data, setData] = useState<DashboardData | null>(() => readDashboardCache());
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     async function loadData() {
+      if (readDashboardCache()) setRefreshing(true);
       try {
-        const pathData = await api.ensureActivePath();
-
-        const mappedNodes = pathData.nodes
-          .map((n: any) => {
-            let status: Node["status"] = "locked";
-            if (n.status === "COMPLETED") status = "completed";
-            if (n.status === "IN_PROGRESS" || n.status === "UNLOCKED") status = "active";
-
-            return {
-              id: n.node_id,
-              title: n.course_title || n.course_id.replace(/^c_/, "").replace(/_/g, " "),
-              status,
-              tier: n.sequence_order,
-              lockReason:
-                status === "locked"
-                  ? "Complete the previous node to unlock this one."
-                  : undefined,
-            } as Node;
-          })
-          .sort((a: Node, b: Node) => a.tier - b.tier);
-
-        const completed = mappedNodes.filter((n: Node) => n.status === "completed").length;
-        const progress =
-          mappedNodes.length > 0
-            ? Math.round((completed / mappedNodes.length) * 100)
-            : 0;
-
-        setData({
-          goal: (pathData as any).goal || "Personalized Pathway",
-          progress,
-          nodes: mappedNodes,
-        });
+        // Prefer cached Redis/RAM path; only call ensure (AI) when missing.
+        let pathData: LearningPath;
+        try {
+          pathData = await api.getActivePath();
+        } catch {
+          pathData = await api.ensureActivePath();
+        }
+        const next = mapPathToDashboard(pathData);
+        writeDashboardCache(next);
+        setData(next);
       } catch (err) {
         console.error("Failed to load pathway", err);
+      } finally {
+        setRefreshing(false);
       }
     }
     loadData();
@@ -103,12 +141,14 @@ export default function DashboardPage() {
             Active Goal
           </Badge>
           <span>{data.goal}</span>
+          {refreshing && (
+            <span className="text-xs text-muted-foreground font-normal">Updating…</span>
+          )}
         </div>
         <h1 className="text-4xl font-heading font-bold">Your Pathway</h1>
         <p className="text-muted-foreground">
-          {
-            data.nodes.filter((n) => n.status === "completed").length
-          } of {data.nodes.length} nodes completed. Nodes unlock one at a time.
+          {data.nodes.filter((n) => n.status === "completed").length} of{" "}
+          {data.nodes.length} nodes completed. Nodes unlock one at a time.
         </p>
       </motion.header>
 
