@@ -35,6 +35,18 @@ class PathwayStage(BaseModel):
     target_skills: list[str]
 
 
+class CapstoneRequirement(BaseModel):
+    requirement_id: str
+    description: str
+    mandatory: bool = True
+
+
+class CapstoneProject(BaseModel):
+    title: str
+    description: str
+    requirements: list[CapstoneRequirement] = Field(default_factory=list)
+
+
 class PathwayExplanation(BaseModel):
     """Structured rationale for generated and ranked learning pathways."""
 
@@ -54,6 +66,28 @@ class PathwayExplanation(BaseModel):
     tools_used: list[str] = Field(
         default_factory=list, description="List of tools invoked during reasoning"
     )
+    capstone: CapstoneProject | None = Field(
+        default=None,
+        description="Recommended capstone project tailored to the learner profile",
+    )
+
+
+class PathGenerateRequest(BaseModel):
+    """Learner profile payload used to author a tailored pathway."""
+
+    learner_id: str = "learner_default"
+    name: str | None = None
+    target_role: str = Field(description="Human-readable target role title")
+    target_role_id: str | None = None
+    custom_role_title: str | None = None
+    target_domain: str | None = None
+    experience_level: str | None = None
+    prior_experience: str | None = None
+    known_skills: list[str] = Field(default_factory=list)
+    interests: list[str] = Field(default_factory=list)
+    learning_style: str | None = None
+    weekly_time: int | None = 10
+    goals: list[str] = Field(default_factory=list)
 
 
 class ProjectMentorFeedback(BaseModel):

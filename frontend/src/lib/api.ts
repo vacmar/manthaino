@@ -2,6 +2,7 @@
 export interface PathNode {
   node_id: string;
   course_id: string;
+  course_title?: string;
   status: "LOCKED" | "UNLOCKED" | "IN_PROGRESS" | "COMPLETED";
   sequence_order: number;
 }
@@ -215,6 +216,12 @@ export const api = {
   // Projects
   async getProject(projectId: string): Promise<any> {
     const res = await fetch(`${BACKEND_URL}/projects/${projectId}`, { ...defaultFetchOpts });
+    if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+    return res.json();
+  },
+
+  async getRecommendedProject(): Promise<any> {
+    const res = await fetch(`${BACKEND_URL}/projects/me/recommended`, { ...defaultFetchOpts });
     if (!res.ok) throw new Error(`Backend returned ${res.status}`);
     return res.json();
   },

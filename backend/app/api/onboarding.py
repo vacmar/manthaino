@@ -61,6 +61,7 @@ WEEKLY_TIME_OPTIONS = [5, 10, 15, 20]
 
 
 class OnboardingRequest(BaseModel):
+    name: str | None = None
     target_role_id: str
     custom_role_title: str | None = None
     target_domain: str | None = None
@@ -107,10 +108,14 @@ def save_onboarding(req: OnboardingRequest, learner: Learner = Depends(get_curre
     custom_title = (req.custom_role_title or "").strip() or None
     role_title = resolve_role_title(req.target_role_id, custom_title)
 
-    # Path generator knows seeded roles; map Other → Backend as a sensible default ladder
-    path_role_id = "role_be" if req.target_role_id == "role_other" else req.target_role_id
+    # Keep catalog id for analytics; AI path generation uses the human role title
+    # and full onboarding answers — do not force unknown Other roles onto Data Eng.
+    path_role_id = req.target_role_id
     if path_role_id not in state_repo.db.get("target_roles", {}):
-        path_role_id = "role_de"
+        path_role_id = "role_other" if "role_other" in state_repo.db.get("target_roles", {}) else "role_de"
+
+    if req.name and req.name.strip():
+        learner.name = req.name.strip()
 
     learner.target_role_id = req.target_role_id
     # Persist human title + optional domain for UI (domain keeps free-text context)
@@ -143,11 +148,27 @@ def save_onboarding(req: OnboardingRequest, learner: Learner = Depends(get_curre
             "target_role": path_role_id,
             "role_title": role_title,
             "custom_role_title": custom_title,
+            "onboarding_answers": {
+                "name": learner.name,
+                "target_role": role_title,
+                "domain": (req.target_domain or "").strip() or None,
+                "experience_level": req.experience_level,
+                "prior_experience": req.prior_experience,
+                "known_skills": learner.known_skills,
+                "interests": learner.interests,
+                "learning_style": req.learning_style,
+                "weekly_time": req.weekly_time,
+                "goals": learner.goals,
+            },
         }
-        if not state_repo.get_active_path(learner.learner_id):
-            replanning_service.generate_path_for_learner(
-                learner.learner_id, path_role_id
-            )
+        # Always (re)build path from AI using the full onboarding profile.
+        existing = state_repo.get_active_path(learner.learner_id)
+        if existing:
+            existing.is_active = False
+            state_repo.save_path(existing)
+        replanning_service.generate_path_for_learner(
+            learner.learner_id, path_role_id
+        )
     except Exception as e:
         print(f"Failed to generate path: {e}")
 

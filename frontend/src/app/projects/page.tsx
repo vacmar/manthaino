@@ -7,8 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { api } from "@/lib/api";
 
-const PROJECT_ID = "proj_1";
-
 export interface ProjectTask {
   id: string;
   title: string;
@@ -42,6 +40,7 @@ function normalizeProject(raw: Record<string, unknown>) {
 }
 
 export default function ProjectsPage() {
+  const [projectId, setProjectId] = useState<string>("proj_1");
   const [data, setData] = useState<{
     title: string;
     description: string;
@@ -56,7 +55,9 @@ export default function ProjectsPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await api.getProject(PROJECT_ID);
+        const res = await api.getRecommendedProject();
+        const id = (res.project_id as string) || "proj_1";
+        setProjectId(id);
         setData(normalizeProject(res as Record<string, unknown>));
       } catch (err) {
         console.error("Failed to load project", err);
@@ -71,7 +72,7 @@ export default function ProjectsPage() {
     setSubmitMessage(null);
     try {
       const me = await api.getMe();
-      const submission = await api.submitProject(PROJECT_ID, me.learner_id, artifactUrl.trim());
+      const submission = await api.submitProject(projectId, me.learner_id, artifactUrl.trim());
       setLastSubmissionId(submission.submission_id);
 
       const evaluation = {
@@ -83,12 +84,12 @@ export default function ProjectsPage() {
           status: "PASS",
           evidence: artifactUrl,
         })),
-        skills_demonstrated: [{ skill_id: "skill_py", score: 0.88, confidence: 0.85 }],
+        skills_demonstrated: [{ skill_id: "skill_js", score: 0.88, confidence: 0.85 }],
         strengths: ["Clear repository structure"],
         improvements: ["Add integration tests"],
       };
 
-      const evalResult = await api.evaluateProject(PROJECT_ID, evaluation);
+      const evalResult = await api.evaluateProject(projectId, evaluation);
       setSubmitMessage(
         evalResult.status === "PASSED"
           ? "Submission evaluated and marked passed."

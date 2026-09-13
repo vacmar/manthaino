@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.api.auth import get_current_learner
 from app.repository import state_repo
 from app.services import project_service
 
@@ -34,23 +35,36 @@ class ProjectEvaluation(BaseModel):
     improvements: list[str]
 
 
+@router.get("/me/recommended")
+def get_recommended_project(learner=Depends(get_current_learner)):
+    profile = state_repo.db.get("learner_profiles", {}).get(learner.learner_id, {})
+    projects = state_repo.db.get("projects", {})
+
+    # Prefer AI-authored capstone for this learner
+    recommended_id = profile.get("recommended_project_id")
+    if recommended_id and recommended_id in projects:
+        return {"project_id": recommended_id, "project": projects[recommended_id]}
+
+    for project_id, project in projects.items():
+        if project.get("learner_id") == learner.learner_id:
+            return {"project_id": project_id, "project": project}
+
+    role = learner.target_role_id or "role_be"
+    path_role = profile.get("target_role", role)
+    for project_id, project in projects.items():
+        roles = project.get("roles") or []
+        if path_role in roles or role in roles:
+            return {"project_id": project_id, "project": project}
+    # fallback
+    first_id = next(iter(projects), "proj_1")
+    return {"project_id": first_id, "project": projects.get(first_id, {})}
+
+
 @router.get("/{project_id}")
 def get_project(project_id: str):
     project = state_repo.get_project(project_id)
     if not project:
-        # Auto-seed MVP project for UI testing
-        project = {
-            "title": "Build a Scalable Data Pipeline",
-            "description": "Apply your Data Engineering knowledge to build a robust, fault-tolerant data pipeline.",
-            "tasks": [
-                {"id": 1, "title": "Setup infrastructure (AWS S3 & EC2)", "completed": True},
-                {"id": 2, "title": "Deploy Apache Kafka", "completed": True},
-                {"id": 3, "title": "Create Spark Streaming job", "completed": False},
-                {"id": 4, "title": "Write unit and integration tests", "completed": False}
-            ]
-        }
-        # Ideally we'd save this to state_repo, but since it's just a mock dict for now:
-        return project
+        raise HTTPException(status_code=404, detail="Project not found")
     return {"project_id": project_id, "project": project}
 
 

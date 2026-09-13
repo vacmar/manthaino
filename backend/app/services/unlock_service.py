@@ -28,15 +28,29 @@ def _evaluate_prereqs(learner_id: str, course_id: str) -> list:
 
 
 def check_unlocks(learner_id: str, path_id: str) -> list[str]:
-    """Evaluates locks and returns a list of newly unlocked node IDs."""
-    unlocked_nodes = []
-    for node_id, node in state_repo.db["nodes"].items():
-        if node.path_id == path_id and node.status == NodeStatus.LOCKED:
-            reasons = _evaluate_prereqs(learner_id, node.course_id)
-            if not reasons:
-                node.status = NodeStatus.UNLOCKED
-                state_repo.update_node(node)
-                unlocked_nodes.append(node_id)
+    """Unlock the next path node only after prior nodes in sequence are COMPLETED."""
+    nodes = [
+        n
+        for n in state_repo.db["nodes"].values()
+        if n.path_id == path_id
+    ]
+    nodes.sort(key=lambda n: n.sequence_order)
+
+    unlocked_nodes: list[str] = []
+    for index, node in enumerate(nodes):
+        if node.status != NodeStatus.LOCKED:
+            continue
+        # Sequence gate: every earlier node must be completed
+        prior = nodes[:index]
+        if prior and not all(p.status == NodeStatus.COMPLETED for p in prior):
+            continue
+        # Also respect skill prerequisites when defined
+        reasons = _evaluate_prereqs(learner_id, node.course_id)
+        if reasons:
+            continue
+        node.status = NodeStatus.UNLOCKED
+        state_repo.update_node(node)
+        unlocked_nodes.append(node.node_id)
     return unlocked_nodes
 
 
@@ -47,7 +61,25 @@ def get_lock_explanation(learner_id: str, node_id: str) -> dict:
         return {"locked": False, "reasons": []}
 
     reasons = _evaluate_prereqs(learner_id, node.course_id)
-    return {"locked": len(reasons) > 0, "reasons": reasons}
+    path_nodes = state_repo.get_nodes_for_path(node.path_id)
+    path_nodes.sort(key=lambda n: n.sequence_order)
+    for prior in path_nodes:
+        if prior.sequence_order >= node.sequence_order:
+            break
+        if prior.status != NodeStatus.COMPLETED:
+            course = state_repo.db.get("courses", {}).get(prior.course_id, {})
+            title = course.get("title", prior.course_id)
+            reasons.append(
+                {
+                    "prerequisite_skill": prior.course_id,
+                    "required_proficiency": 1.0,
+                    "current_proficiency": 0.0,
+                    "status": "PRIOR_NODE_INCOMPLETE",
+                    "message": f"Complete “{title}” first",
+                }
+            )
+
+    return {"locked": len(reasons) > 0 or node.status == NodeStatus.LOCKED, "reasons": reasons}
 
 
 def get_next_recommended_node(learner_id: str, path_id: str) -> str | None:

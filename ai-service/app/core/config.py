@@ -6,8 +6,13 @@ class Settings(BaseSettings):
     port: int = 8001
     environment: str = "development"
 
-    # LLM Provider selection: "openrouter", "groq", or "mock"
-    llm_provider: str = "openrouter"
+    # LLM Provider selection: "huggingface", "openrouter", "groq", or "mock"
+    llm_provider: str = "mock"
+
+    # Hugging Face (OpenAI-compatible Inference Providers router)
+    huggingface_api_key: str | None = None
+    huggingface_base_url: str = "https://router.huggingface.co/v1"
+    huggingface_model: str = "meta-llama/Llama-3.1-8B-Instruct"
 
     # OpenRouter configurations
     openrouter_api_key: str | None = None
@@ -25,7 +30,7 @@ class Settings(BaseSettings):
     # Inference settings
     temperature: float = 0.2
     max_tokens: int = 2048
-    request_timeout: float = 60.0
+    request_timeout: float = 90.0
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"

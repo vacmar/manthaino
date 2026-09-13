@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import chat, tools
+from app.api import chat, path, tools
 from app.core.config import settings
 from app.tools.registry import ALL_TOOLS
 
@@ -21,6 +21,7 @@ app.add_middleware(
 )
 
 app.include_router(chat.router)
+app.include_router(path.router)
 app.include_router(tools.router)
 
 

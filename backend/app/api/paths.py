@@ -34,9 +34,15 @@ def get_me_active_path(learner=Depends(get_current_learner)):
         )
 
     nodes = state_repo.get_nodes_for_path(path.path_id)
+    enriched = []
+    for n in nodes:
+        course = state_repo.db.get("courses", {}).get(n.course_id, {})
+        payload = n.model_dump()
+        payload["course_title"] = course.get("title", n.course_id)
+        enriched.append(payload)
     return {
         "path_id": path.path_id,
-        "nodes": nodes,
+        "nodes": enriched,
         "is_active": True,
         "goal": learner.goals[0] if learner.goals else "Personalized Pathway",
     }
